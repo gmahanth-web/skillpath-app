@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SkillPath AI — Career Intelligence</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* --- 1. THEME VARIABLES (DEFAULT: COSMIC) --- */
+    :root {
+      --bg-color: #030014;
+      --sidebar-bg: rgba(3, 0, 20, 0.95);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      --accent-glow: rgba(139, 92, 246, 0.3);
+      --primary: #8b5cf6;
+      --secondary: #3b82f6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --modal-overlay: rgba(0, 0, 0, 0.85);
+      --blob-1: #7c3aed;
+      --blob-2: #2563eb;
+      --blob-3: #db2777;
+    }
+
+    /* THEME: EMERALD (Hacker/Matrix) */
+    [data-theme="emerald"] {
+      --bg-color: #022c22;
+      --sidebar-bg: rgba(6, 78, 59, 0.95);
+      --card-bg: rgba(16, 185, 129, 0.05);
+      --card-border: rgba(52, 211, 153, 0.2);
+      --text-main: #ecfdf5;
+      --text-muted: #6ee7b7;
+      --primary: #10b981;
+      --secondary: #34d399;
+      --accent-glow: rgba(16, 185, 129, 0.4);
+      --blob-1: #065f46; --blob-2: #047857; --blob-3: #064e3b;
+    }
+
+    /* THEME: SUNSET (Warm) */
+    [data-theme="sunset"] {
+      --bg-color: #450a0a;
+      --sidebar-bg: rgba(69, 10, 10, 0.95);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(251, 113, 133, 0.2);
+      --text-main: #fff1f2;
+      --text-muted: #fda4af;
+      --primary: #f43f5e;
+      --secondary: #fb923c;
+      --accent-glow: rgba(244, 63, 94, 0.4);
+      --blob-1: #be123c; --blob-2: #c2410c; --blob-3: #9f1239;
+    }
+
+    /* THEME: CORPORATE (Light/Clean) */
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --secondary: #4f46e5;
+      --accent-glow: rgba(37, 99, 235, 0.1);
+      --modal-overlay: rgba(255, 255, 255, 0.8);
+      --blob-1: #bfdbfe; --blob-2: #ddd6fe; --blob-3: #e0e7ff;
+    }
+
+    * { box-sizing: border-box; transition: all 0.3s ease; }
+    
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-color);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .bg-mesh {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+      background: 
+        radial-gradient(circle at 15% 50%, var(--blob-1), transparent 50%),
+        radial-gradient(circle at 85% 30%, var(--blob-2), transparent 50%),
+        linear-gradient(180deg, var(--bg-color) 0%, var(--blob-3) 100%);
+      filter: blur(60px);
+      background-size: 150% 150%;
+      animation: gradientMove 15s ease infinite;
+    }
+    @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+    /* --- LAYOUT --- */
+    .login-wrapper { display: flex; justify-content: center; align-items: center; height: 100vh; width: 100%; position: absolute; top: 0; left: 0; z-index: 999; background: var(--bg-color); backdrop-filter: blur(10px); }
+    
+    /* GLASSMORPHISM LOGIN BOX */
+    .login-box { 
+        background: var(--card-bg); 
+        border: 1px solid var(--card-border); 
+        padding: 50px 40px; 
+        border-radius: 24px; 
+        width: 90%; max-width: 420px; 
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
+        text-align: center; 
+        position: relative; overflow: hidden;
+        backdrop-filter: blur(20px);
+    }
+    
+    .app { display: none; grid-template-columns: 260px 1fr; height: 100vh; }
+    .app.active-app { display: grid; }
+    
+    aside { background: var(--sidebar-bg); border-right: 1px solid var(--card-border); padding: 24px 16px; display: flex; flex-direction: column; z-index: 10; overflow-y: auto; }
+    main { padding: 32px 48px; overflow-y: auto; scroll-behavior: smooth; }
+
+    /* --- COMPONENTS --- */
+    .brand { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 32px; display: flex; align-items: center; gap: 10px; }
+    .nav-link { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px; border-radius: 12px; color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 14px; border: 1px solid transparent; cursor: pointer; }
+    .nav-link:hover { background: var(--card-bg); color: var(--text-main); }
+    .nav-link.active { background: rgba(139, 92, 246, 0.15); border: 1px solid var(--primary); color: var(--primary); }
+
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 32px; margin-bottom: 24px; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.02); transition: transform 0.2s; }
+    .card:hover { transform: translateY(-3px); }
+    .grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+    
+    .btn { padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+    .btn:hover { background: var(--card-border); filter: brightness(1.1); }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; color: #fff; box-shadow: 0 4px 15px var(--accent-glow); }
+    
+    .input-field { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); font-size: 1rem; outline: none; margin-bottom: 15px; }
+    .input-field:focus { border-color: var(--primary); background: rgba(255,255,255,0.1); }
+    
+    /* Text Area specific */
+    textarea.input-field { resize: vertical; min-height: 120px; font-family: 'Inter', sans-serif; line-height: 1.6; }
+
+    /* Login Specifics */
+    .google-btn { background: white; color: #333; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 12px; border-radius: 10px; border: none; font-weight: 600; font-size: 15px; cursor: pointer; margin-bottom: 20px; }
+    .google-btn:hover { background: #f2f2f2; }
+    .divider { display: flex; align-items: center; color: var(--text-muted); font-size: 12px; margin: 24px 0; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--card-border); margin: 0 10px; }
+    .auth-toggle { margin-top: 25px; font-size: 14px; color: var(--text-muted); }
+    .auth-toggle a { color: var(--primary); cursor: pointer; font-weight: 600; margin-left: 5px; }
+    .error-msg { color: var(--error); font-size: 13px; margin-bottom: 15px; display: none; background: rgba(239,68,68,0.1); padding: 8px; border-radius: 6px; }
+
+    /* UTILS & ANIMATION */
+    .hide { display: none !important; }
+    .fade-in { animation: fadeIn 0.5s ease forwards; opacity: 0; transform: translateY(10px); }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+    
+    /* GAUGE & SELECTS */
+    .input-select { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); font-size: 1rem; outline: none; margin-bottom: 15px; appearance: none; }
+    .input-select option { background-color: var(--bg-color); color: var(--text-main); }
+    
+    .score-circle { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(var(--primary) 0deg, var(--card-border) 0deg); display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto 20px auto; }
+    .score-circle::before { content: ''; position: absolute; width: 100px; height: 100px; background: var(--bg-color); border-radius: 50%; }
+    .score-value { position: relative; font-size: 32px; font-weight: 800; font-family: 'Outfit', sans-serif; }
+    .criteria-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--card-border); }
+    .criteria-item:last-child { border-bottom: none; }
+
+    /* TICKER (FIXED) */
+    .ticker-container { margin-bottom: 30px; border-radius: 12px; background: rgba(139, 92, 246, 0.05); border: 1px solid var(--card-border); overflow: hidden; padding: 10px; position: relative; z-index: 5; }
+    .ticker-wrapper { display: flex; width: fit-content; animation: scroll 40s linear infinite; }
+    .ticker-item { margin: 0 20px; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+    .ticker-item:hover { color: var(--primary); text-decoration: underline; }
+    @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+    /* LOADING SPINNER */
+    .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* THEME SWITCHER */
+    .theme-panel { margin-top: 20px; padding: 15px; border-top: 1px solid var(--card-border); }
+    .theme-title { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; font-weight: 600; text-transform: uppercase; }
+    .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .theme-btn { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; }
+    .theme-btn:hover { transform: scale(1.1); }
+    .theme-btn.active { border-color: var(--text-main); }
+
+    /* Login Input */
+    .login-input { width: 100%; padding: 14px; margin-bottom: 15px; border-radius: 10px; border: 1px solid var(--card-border); background: rgba(0,0,0,0.2); color: var(--text-main); font-size: 1rem; outline: none; transition: 0.2s; }
+    .login-input:focus { border-color: var(--primary); background: rgba(0,0,0,0.4); }
+
+    /* COURSE PLAYER STYLES */
+    .player-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; height: 65vh; }
+    .module-sidebar { border-right: 1px solid var(--card-border); padding-right: 20px; overflow-y: auto; }
+    .module-btn { display: block; width: 100%; text-align: left; padding: 15px; border-radius: 10px; margin-bottom: 8px; background: transparent; border: 1px solid transparent; color: var(--text-muted); cursor: pointer; font-size: 14px; transition: 0.2s; }
+    .module-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+    .module-btn.active { background: rgba(139, 92, 246, 0.1); border-color: var(--primary); color: white; font-weight: 600; }
+    
+    .content-viewer { padding: 0 20px; overflow-y: auto; line-height: 1.7; }
+    .content-viewer h3 { color: var(--primary); margin-top: 0; }
+    .code-snippet { background: #1e1e1e; padding: 15px; border-radius: 8px; border-left: 3px solid var(--secondary); font-family: monospace; font-size: 13px; color: #d4d4d4; margin: 20px 0; }
+    
+    /* Quiz */
+    .quiz-option { padding: 16px; margin-bottom: 8px; border-radius: 10px; cursor: pointer; background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); transition: 0.2s; font-weight: 500; width: 100%; text-align: left;}
+    .quiz-option:hover { border-color: var(--primary); background: rgba(139, 92, 246, 0.05); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981; }
+    .quiz-option.wrong { background: rgba(239, 68, 68, 0.1); border-color: #ef4444; color: #ef4444; }
+    
+    .tag { padding: 4px 12px; border-radius: 20px; background: var(--card-bg); border: 1px solid var(--card-border); font-size: 12px; color: var(--text-main); }
+    
+    /* DASHBOARD GRAPH BARS */
+    .chart-bar { height: 150px; display: flex; align-items: flex-end; gap: 10px; justify-content: space-between; padding-top:20px;}
+    .bar { width: 100%; background: rgba(139,92,246,0.2); border-radius: 4px; position: relative; }
+    .bar:hover { background: var(--primary); }
+    .bar span { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); }
+
+    /* PLATFORM CARDS */
+    .platform-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 20px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; }
+    .platform-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+    .p-logo { font-weight: 800; font-size: 18px; margin-bottom: 5px; }
+    .brand-linkedin { color: #0077b5; } .brand-naukri { color: #4a90e2; } .brand-indeed { color: #2164f3; } .brand-internshala { color: #008bdc; }
+
+    /* MENTOR MODAL */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-overlay); backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+    .modal-content { background: var(--bg-color); border: 1px solid var(--card-border); padding: 40px; border-radius: 24px; max-width: 500px; width: 90%; text-align: center; transform: translateY(20px); transition: transform 0.3s; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+    .modal-overlay.active .modal-content { transform: translateY(0); }
+    .modal-img { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--primary); margin-bottom: 20px; object-fit: cover; }
+    
+    .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+    .slot-btn { padding: 12px; border-radius: 8px; border: 1px solid var(--primary); background: rgba(139, 92, 246, 0.1); color: var(--text-main); cursor: pointer; transition: 0.2s; }
+    .slot-btn:hover { background: var(--primary); color: white; }
+    .success-msg { margin-top: 20px; font-weight: 700; font-size: 18px; color: var(--success); animation: fadeIn 0.5s ease; }
+    
+    /* TREND LINK */
+    .trend-link { display: block; text-decoration: none; padding: 14px; margin-bottom: 10px; background: var(--card-border); border-radius: 10px; font-size: 14px; color: var(--text-main); font-weight: 500; border: 1px solid transparent; transition: all 0.2s; }
+    .trend-link:hover { background: var(--card-bg); border-color: var(--primary); transform: translateX(5px); }
+    .trend-source { font-size: 11px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px; }
+    .progress-widget { background: var(--card-bg); border: 1px solid var(--card-border); padding: 15px; border-radius: 12px; margin-top: auto; margin-bottom: 20px; }
+    .progress-bar-bg { height: 6px; width: 100%; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; background: var(--primary); border-radius: 10px; transition: width 0.5s ease; }
+
+    /* --- ADDED CSS FOR NEW FEATURES --- */
+    /* Chat Bubbles */
+    .chat-box { height: 350px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--card-border); }
+    .msg { padding: 10px 15px; border-radius: 12px; max-width: 80%; font-size: 14px; line-height: 1.5; }
+    .msg-ai { align-self: flex-start; background: rgba(255,255,255,0.1); color: var(--text-main); border-bottom-left-radius: 2px; }
+    .msg-user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+    
+    /* File Upload Box (Glassmorphism Style) */
+    .file-upload-label { 
+        display: block; 
+        border: 2px dashed var(--card-border); 
+        padding: 40px; 
+        text-align: center; 
+        border-radius: 16px; 
+        cursor: pointer; 
+        color: var(--text-muted); 
+        transition: 0.3s; 
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .file-upload-label:hover { 
+        border-color: var(--primary); 
+        color: white; 
+        background: rgba(139, 92, 246, 0.05); 
+        transform: translateY(-2px);
+    }
+
+    /* CAMERA MODAL CSS */
+    .camera-modal { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; display:none; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(10px); }
+    .camera-video { width: 90%; max-width: 500px; border-radius: 12px; border: 2px solid var(--primary); transform: scaleX(-1); /* Mirror */ margin-bottom: 20px; box-shadow: 0 0 20px var(--primary); }
+    .cam-controls { display: flex; gap: 20px; }
+
+    /* REALISTIC PATH CARDS */
+    .path-step-card {
+        border-left: 4px solid var(--primary);
+        padding: 20px;
+        background: var(--card-bg);
+        border-radius: 10px;
+        margin-bottom: 15px;
+        position: relative;
+    }
+    .path-step-num {
+        position: absolute;
+        top: -10px; left: -10px;
+        background: var(--primary);
+        color: white;
+        width: 30px; height: 30px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        box-shadow: 0 4px 10px var(--accent-glow);
+    }
+    .resource-btn {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 6px 12px;
+        font-size: 12px;
+        background: rgba(255,255,255,0.05);
+        color: var(--text-muted);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        text-decoration: none;
+        transition: 0.2s;
+    }
+    .resource-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    /* ATS Score Bar */
+    .ats-score-container { margin-top: 20px; background: rgba(0,0,0,0.2); border-radius: 10px; height: 20px; width: 100%; position: relative; overflow: hidden; }
+    .ats-score-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--error), var(--warning), var(--success)); transition: width 1s ease-out; }
+    .keyword-badge { display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+    .keyword-missing { background: rgba(239, 68, 68, 0.2); color: var(--error); border: 1px solid var(--error); }
+    .keyword-found { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
+
+  </style>
+</head>
+<body>
+
+  <div class="bg-mesh"></div>
+
+  <div id="login-view" class="login-wrapper">
+      <div class="login-box fade-in">
+          <div class="brand" style="justify-content:center; font-size:28px; margin-bottom: 10px;">SkillPath <span>AI</span></div>
+          <h2 id="authTitle" style="margin-bottom: 5px; margin-top: 0; color: var(--text-main);">Welcome back</h2>
+          <p id="authSubtitle" style="font-size: 14px; margin-bottom: 25px; color: var(--text-muted);">Enter your details to access your dashboard.</p>
+          
+          <button onclick="handleGoogleLogin()" class="google-btn">
+             <span>Sign in with Google</span>
+          </button>
+
+          <div class="divider">OR</div>
+          <div id="loginError" class="error-msg">Incorrect credentials.</div>
+
+          <input type="text" id="loginUser" class="login-input" placeholder="Username (admin)" required>
+          <input type="password" id="loginPass" class="login-input" placeholder="Password (12345)" required>
+          <button onclick="handleLoginClick()" class="btn btn-primary" style="width:100%;">Log In</button>
+          
+          <div class="auth-toggle">
+              <span id="toggleText">Don't have an account?</span> <a onclick="toggleAuthMode()">Sign up</a>
+          </div>
+          <div style="margin-top:20px; font-size:12px; color:var(--text-muted); opacity: 0.6;">Demo: Use <strong>admin</strong> / <strong>12345</strong></div>
+      </div>
+  </div>
+
+  <div id="app-view" class="app">
+    <aside>
+      <div class="brand">SkillPath <span>AI</span></div>
+      <nav>
+        <a onclick="nav('overview')" id="btn-overview" class="nav-link active">📊 Overview</a>
+        <a onclick="nav('dashboard')" id="btn-dashboard" class="nav-link">📈 My Dashboard</a>
+        <a onclick="nav('trending')" id="btn-trending" class="nav-link">🔥 Trending Courses</a>
+        <a onclick="nav('eligibility')" id="btn-eligibility" class="nav-link">✅ Eligibility</a>
+        <a onclick="nav('skills')" id="btn-skills" class="nav-link">💼 Skill Matcher</a>
+        
+        <a onclick="nav('interview')" id="btn-interview" class="nav-link">🎤 AI Interview (Real)</a>
+        <a onclick="nav('resume')" id="btn-resume" class="nav-link">📄 ATS Checker (Text)</a>
+        <a onclick="nav('salary')" id="btn-salary" class="nav-link">💰 Salary AI</a>
+
+        <a onclick="nav('profile')" id="btn-profile" class="nav-link">👤 Profile</a>
+        <a onclick="nav('recommendations')" id="btn-recommendations" class="nav-link">🎯 My Path (AI)</a>
+        <a onclick="nav('mentorship')" id="btn-mentorship" class="nav-link">💬 Mentors</a>
+        <a onclick="nav('jobs')" id="btn-jobs" class="nav-link">💼 Live Jobs</a>
+      </nav>
+
+      <div class="progress-widget">
+         <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-main); font-weight:600;"><span>Profile Strength</span><span id="progText">0%</span></div>
+         <div class="progress-bar-bg"><div id="progBar" class="progress-fill"></div></div>
+      </div>
+
+      <div class="theme-panel">
+          <div class="theme-title">Select Theme</div>
+          <div class="theme-grid">
+              <div onclick="setTheme('default')" class="theme-btn active" style="background:#030014;" title="Cosmic (Default)"></div>
+              <div onclick="setTheme('emerald')" class="theme-btn" style="background:#022c22;" title="Emerald (Hacker)"></div>
+              <div onclick="setTheme('sunset')" class="theme-btn" style="background:#450a0a;" title="Sunset (Warm)"></div>
+              <div onclick="setTheme('light')" class="theme-btn" style="background:#f8fafc;" title="Corporate (Light)"></div>
+          </div>
+      </div>
+
+      <button class="btn" style="margin-top:10px; border-color: #ef4444; color:#ef4444;" onclick="logout()">Log Out</button>
+    </aside>
+
+    <main>
+      <div class="ticker-container fade-in">
+        <div class="ticker-wrapper" id="liveTicker">
+          </div>
+      </div>
+
+      <div id="view-overview" class="view-section fade-in">
+        <div class="grid-2">
+          <div class="card">
+            <span style="font-size: 12px; font-weight: 800; color: var(--primary); letter-spacing: 1px;">AI CAREER ACCELERATOR</span>
+            <h1 style="color:var(--text-main); margin-top:10px;">Align your skills<br>to the future.</h1>
+            <p>Personalized learning paths, live market data, and expert mentorship.</p>
+            <div style="display:flex; gap: 12px;">
+              <button onclick="nav('eligibility')" class="btn btn-primary">Check Eligibility</button>
+              <button onclick="nav('jobs')" class="btn">Browse Jobs</button>
+            </div>
+          </div>
+          <div class="card"><h3>📈 Live Trends (24h)</h3><div id="trendList" style="margin-top: 16px;"></div></div>
+        </div>
+        <h3 style="margin-top: 40px; margin-bottom: 20px; color:var(--text-main);">Featured Mentors</h3>
+        <div class="grid-2" id="homeMentorGrid"></div>
+      </div>
+
+      <div id="view-dashboard" class="view-section hide fade-in">
+          <div class="grid-2">
+              <div class="card">
+                  <h3 style="color:var(--text-main);">Weekly Activity</h3>
+                  <div class="chart-bar">
+                      <div class="bar" style="height:40%;"><span>M</span></div>
+                      <div class="bar" style="height:60%;"><span>T</span></div>
+                      <div class="bar" style="height:30%;"><span>W</span></div>
+                      <div class="bar" style="height:80%; background:var(--success);"><span>T</span></div>
+                      <div class="bar" style="height:50%;"><span>F</span></div>
+                      <div class="bar" style="height:20%;"><span>S</span></div>
+                      <div class="bar" style="height:10%;"><span>S</span></div>
+                  </div>
+              </div>
+              <div class="card">
+                  <h3 style="color:var(--text-main);">Current Status</h3>
+                  <div style="margin-top:20px;">
+                      <div class="criteria-item"><span style="color:var(--text-muted);">Courses Completed</span><span id="dashCompleted" style="color:var(--text-main); font-weight:bold;">0</span></div>
+                      <div class="criteria-item"><span style="color:var(--text-muted);">XP Earned</span><span id="dashXP" style="color:var(--text-main); font-weight:bold;">0</span></div>
+                      <div class="criteria-item" style="border:none;"><span style="color:var(--text-muted);">Skills Gained</span><span id="dashSkills" style="color:var(--success); font-weight:bold;">0</span></div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div id="view-trending" class="view-section hide fade-in">
+          <h3 style="color:var(--text-main); margin-bottom:20px;">🔥 Featured Career Paths</h3>
+          <p style="color:var(--text-muted); margin-bottom:30px;">Top 30+ Industry-Standard Courses with GeeksforGeeks References.</p>
+          <div class="grid-4" id="trendingGrid"></div>
+      </div>
+
+      <div id="view-eligibility" class="view-section hide fade-in">
+        <div class="grid-2">
+            <div class="card">
+                <h3 style="color:var(--text-main);">Check Role Eligibility</h3>
+                <label style="font-size:14px; color:var(--text-muted);">Target Role</label>
+                <select id="eligRole" class="input-select">
+                    <option value="Frontend Developer">Frontend Developer</option>
+                    <option value="Data Scientist">Data Scientist</option>
+                    <option value="Backend Engineer">Backend Engineer</option>
+                    <option value="UI/UX Designer">UI/UX Designer</option>
+                </select>
+                <label style="font-size:14px; color:var(--text-muted);">Your Current Skills</label>
+                <input type="text" id="eligSkills" class="input-field" placeholder="e.g. React, CSS, Python...">
+                <label style="font-size:14px; color:var(--text-muted);">Years of Experience</label>
+                <input type="number" id="eligExp" class="input-field" placeholder="e.g. 2">
+                <button onclick="calculateEligibility()" class="btn btn-primary" style="width:100%;">Calculate Score</button>
+            </div>
+            <div class="card" id="eligResult" style="display:none; text-align:center;">
+                <h3 style="color:var(--text-main);">Eligibility Score</h3>
+                <div class="score-circle" id="scoreCircle"><div class="score-value" id="scoreValue">0%</div></div>
+                <div class="score-label" id="scoreText">Calculating...</div>
+                <div style="margin-top:30px; text-align:left;">
+                    <div class="criteria-item"><span style="color:var(--text-muted);">Skill Match</span><span id="resSkills" style="font-weight:bold; color:var(--text-main);">-</span></div>
+                    <div class="criteria-item"><span style="color:var(--text-muted);">Experience</span><span id="resExp" style="font-weight:bold; color:var(--text-main);">-</span></div>
+                    <div class="criteria-item" style="border:none;"><span style="color:var(--text-muted);">Missing</span><span id="resMissing" style="font-weight:bold; color:var(--warning);">-</span></div>
+                </div>
+                <button onclick="showImprovementPlan()" class="btn" style="margin-top:20px; width:100%;">Get AI Course Plan</button>
+            </div>
+        </div>
+        <div id="eligRecommendations" class="fade-in" style="display:none; margin-top:20px;">
+            <div id="loadingIndicator" style="display:none; text-align:center; padding: 20px;">
+                <div class="loader"></div><p style="color:var(--text-muted); margin-top:10px;">Consulting AI...</p>
+            </div>
+            <div id="aiResponseContent"></div>
+        </div>
+      </div>
+
+      <div id="view-skills" class="view-section hide fade-in">
+        <div class="card" style="max-width: 900px; margin: 0 auto;">
+          <h2 style="color:var(--text-main); margin-bottom: 10px;">Skill-Based Job Matcher</h2>
+          <p style="color:var(--text-muted); margin-bottom:20px;">Enter your skills, and our AI will find real-world job roles that match your profile.</p>
+          
+          <div style="display:flex; gap:10px;">
+              <input type="text" id="skillSearchInput" class="input-field" placeholder="e.g. React, Node.js, Python, AWS" style="margin-bottom:0;">
+              <button onclick="searchJobsBySkills()" class="btn btn-primary" style="width:auto; white-space: nowrap;">Find Matches</button>
+          </div>
+
+          <div id="skillJobLoader" class="loader hide" style="margin-top:30px;"></div>
+
+          <div id="skillJobResults" class="grid-2" style="margin-top:30px;">
+              </div>
+        </div>
+      </div>
+
+      <div id="view-interview" class="view-section hide fade-in">
+          <div class="card" style="height: 80vh; display: flex; flex-direction: column;">
+              <div style="border-bottom:1px solid var(--card-border); margin-bottom:10px; padding-bottom:10px;">
+                  <h3 style="margin:0; color:var(--text-main);">AI Interview Coach</h3>
+                  <p style="margin:0; font-size:12px; color:var(--text-muted);">Practice for your target role.</p>
+              </div>
+              <div id="chatBox" class="chat-box" style="flex:1;">
+                  <div class="msg msg-ai">Hello! I am your AI Recruiter. Tell me about yourself.</div>
+              </div>
+              <div style="display:flex; gap:10px;">
+                  <input type="text" id="chatInput" class="input-field" style="margin:0;" placeholder="Type your answer..." onkeypress="if(event.key==='Enter') sendChat()">
+                  <button onclick="sendChat()" class="btn btn-primary" style="width:auto;">Send</button>
+              </div>
+          </div>
+      </div>
+
+      <div id="view-resume" class="view-section hide fade-in">
+          <div class="card" style="max-width: 900px; margin: 0 auto;">
+              <h2 style="color:var(--text-main);">ATS Resume Checker</h2>
+              <p style="color:var(--text-muted); margin-bottom:20px;">Paste your resume text and the job description to check your ATS score and get instant improvements.</p>
+              
+              <div class="grid-2">
+                  <div>
+                      <label style="font-size:13px; color:var(--primary); font-weight:bold;">1. PASTE RESUME TEXT</label>
+                      <textarea id="resumeText" class="input-field" placeholder="Copy and paste your full resume content here..."></textarea>
+                  </div>
+                  <div>
+                      <label style="font-size:13px; color:var(--primary); font-weight:bold;">2. PASTE JOB DESCRIPTION</label>
+                      <textarea id="jobDesc" class="input-field" placeholder="Copy the job description you are applying for..."></textarea>
+                  </div>
+              </div>
+              
+              <button onclick="scanResume()" class="btn btn-primary" style="width:100%; margin-top:20px;">Check ATS Score</button>
+              
+              <div id="resumeLoader" class="loader hide" style="margin-top:20px;"></div>
+
+              <div id="resumeResult" class="hide" style="margin-top: 30px;">
+                  <div class="card" style="background: rgba(0,0,0,0.3); border:1px solid var(--card-border);">
+                      <div style="display:flex; justify-content:space-between; align-items:center;">
+                          <h3 style="margin:0; color:var(--text-main);">ATS Match Score</h3>
+                          <div style="font-size:24px; font-weight:bold; color:var(--primary);" id="atsScoreDisplay">0/100</div>
+                      </div>
+                      <div class="ats-score-container">
+                          <div id="atsScoreFill" class="ats-score-fill"></div>
+                      </div>
+                  </div>
+
+                  <div class="grid-2" style="margin-top:20px;">
+                      <div class="card" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.2);">
+                          <h4 style="color:var(--error); margin-top:0;">⚠️ Missing Keywords</h4>
+                          <div id="missingKeywords"></div>
+                      </div>
+                      <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
+                          <h4 style="color:var(--success); margin-top:0;">✨ Improvements</h4>
+                          <div id="resumeFeedback" style="font-size:14px; color:var(--text-muted); line-height:1.6;"></div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div id="view-salary" class="view-section hide fade-in">
+          <div class="grid-2">
+              <div class="card">
+                  <h3 style="color:var(--text-main);">Salary Negotiator</h3>
+                  <label style="color:var(--text-muted); font-size:13px;">Job Role</label>
+                  <input type="text" id="salRole" class="input-field" value="Frontend Developer">
+                  
+                  <label style="color:var(--text-muted); font-size:13px;">Current Offer</label>
+                  <input type="text" id="salOffer" class="input-field" placeholder="$80,000">
+                  
+                  <label style="color:var(--text-muted); font-size:13px;">Years Experience</label>
+                  <input type="text" id="salExp" class="input-field" placeholder="3 years">
+
+                  <button onclick="negotiateSalary()" class="btn btn-primary" style="width:100%;">Generate Professional Email</button>
+              </div>
+              <div class="card">
+                  <h3 style="color:var(--text-main);">Generated Script</h3>
+                  <div id="salaryResult" style="color:var(--text-muted); font-style:italic; white-space: pre-wrap; font-family:monospace; background:rgba(0,0,0,0.3); padding:15px; border-radius:8px;">Script will appear here...</div>
+              </div>
+          </div>
+      </div>
+
+      <div id="view-profile" class="view-section hide fade-in">
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+          <h2 style="color:var(--text-main); margin-bottom: 20px; text-align:center;">Edit Profile</h2>
+          
+          <div style="text-align:center; margin-bottom:30px;">
+              <div style="position:relative; display:inline-block;">
+                  <img id="profileImg" src="https://i.pravatar.cc/150?u=admin" style="width:120px; height:120px; border-radius:50%; border:3px solid var(--primary); object-fit:cover;">
+              </div>
+              <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
+                  <label for="pfpUpload" class="btn" style="padding:8px 15px; font-size:13px; background:var(--card-bg);">📂 Upload</label>
+                  <input type="file" id="pfpUpload" style="display:none;" onchange="updatePFP(this)">
+                  <button onclick="openCameraModal()" class="btn" style="padding:8px 15px; font-size:13px; background:var(--primary); border:none; color:white;">📷 Camera</button>
+              </div>
+          </div>
+
+          <div style="display:grid; gap:20px;">
+              <div>
+                  <label style="color:var(--text-muted); font-size:13px; display:block; margin-bottom:5px;">Full Name</label>
+                  <input id="profileNameInput" type="text" class="input-field" placeholder="Enter your name">
+              </div>
+
+              <div>
+                  <label style="color:var(--text-muted); font-size:13px; display:block; margin-bottom:5px;">Email Address</label>
+                  <input id="profileEmailInput" type="email" class="input-field" placeholder="Enter email" disabled style="opacity:0.7; cursor:not-allowed;">
+              </div>
+
+              <div>
+                  <label style="color:var(--text-muted); font-size:13px; display:block; margin-bottom:5px;">Phone Number</label>
+                  <input id="profilePhone" type="tel" class="input-field" placeholder="+91 99999 88888">
+              </div>
+
+              <div>
+                  <label style="color:var(--text-muted); font-size:13px; display:block; margin-bottom:5px;">Location</label>
+                  <input id="profileLoc" type="text" class="input-field" placeholder="City, Country">
+              </div>
+              
+              <div>
+                  <label style="color:var(--text-muted); font-size:13px; display:block; margin-bottom:5px;">Professional Title</label>
+                  <input id="profileTitle" type="text" class="input-field" placeholder="e.g. Frontend Developer">
+              </div>
+
+              <button onclick="saveProfile()" class="btn btn-primary" style="width:100%; margin-top:10px;">Save Profile</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-recommendations" class="view-section hide fade-in">
+        <div class="card">
+            <h3 style="color:var(--text-main);">Your Realistic AI Path</h3>
+            <p style="color:var(--text-muted);">Get a step-by-step roadmap with curated resources to master your target role.</p>
+            <button onclick="loadAIPath()" class="btn btn-primary" style="width:auto; margin-top:10px;">Generate Best Path</button>
+            
+            <div id="pathLoader" class="loader hide" style="margin-top:30px;"></div>
+            
+            <div id="pathContent" style="margin-top:30px;"></div>
+        </div>
+      </div>
+
+      <div id="view-learning" class="view-section hide fade-in">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div style="display:flex; gap:10px;">
+                <button onclick="nav('trending')" class="btn">← Back</button>
+                <a id="courseRefBtn" href="#" target="_blank" class="btn" style="background:var(--card-bg); border:1px solid var(--success); color:var(--success);">📖 GFG Reference</a>
+            </div>
+            <h2 id="playerCourseTitle" style="color: var(--primary); margin:0;">Course Title</h2>
+        </div>
+        
+        <div class="card" style="padding:0; overflow:hidden;">
+            <div class="player-layout">
+                <div class="module-sidebar" id="moduleList">
+                    </div>
+                <div class="content-viewer">
+                    <div id="learnContent"></div>
+                    <div id="quizArea" class="hide" style="margin-top:30px; border-top:1px solid var(--card-border); padding-top:20px;">
+                        <h3 style="color:var(--accent);">🧠 Knowledge Check</h3>
+                        <h4 id="quizQuestion" style="margin-bottom:15px; color:white;"></h4>
+                        <div id="quizOptions"></div>
+                        <div id="quizFeedback" style="margin-top:15px; font-weight:bold;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      <div id="view-mentorship" class="view-section hide fade-in">
+        <div class="card"><h3 style="color:var(--text-main);">Available Mentors</h3><div id="fullMentorList" class="grid-2"></div></div>
+      </div>
+
+      <div id="view-jobs" class="view-section hide fade-in">
+        <h3 style="color:var(--text-main); margin-bottom:15px;">Quick Apply Platforms</h3>
+        <div class="grid-4" style="margin-bottom: 30px;">
+            <div class="platform-card" onclick="searchExternalJob('linkedin')"><div class="p-logo brand-linkedin" style="color:#0077b5;">LinkedIn</div><div style="color:#94a3b8; font-size:12px;">Search Jobs</div></div>
+            <div class="platform-card" onclick="searchExternalJob('naukri')"><div class="p-logo brand-naukri" style="color:#4a90e2;">Naukri</div><div style="color:#94a3b8; font-size:12px;">India's #1</div></div>
+            <div class="platform-card" onclick="searchExternalJob('indeed')"><div class="p-logo brand-indeed" style="color:#2164f3;">Indeed</div><div style="color:#94a3b8; font-size:12px;">Global</div></div>
+            <div class="platform-card" onclick="searchExternalJob('internshala')"><div class="p-logo brand-internshala" style="color:#008bdc;">Internshala</div><div style="color:#94a3b8; font-size:12px;">Freshers</div></div>
+        </div>
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="color:var(--text-main);">AI-Matched Live Jobs</h3>
+                <button onclick="loadAIJobs()" class="btn btn-primary" style="width:auto;">Refresh Feed</button>
+            </div>
+            <div id="jobsLoader" class="loader hide" style="margin-top:20px;"></div>
+            <div id="jobsContent" class="grid-2" style="margin-top:20px;"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="cameraModal" class="camera-modal">
+      <video id="camVideo" autoplay playsinline class="camera-video"></video>
+      <canvas id="camCanvas" style="display:none;"></canvas>
+      <div class="cam-controls">
+          <button onclick="capturePhoto()" class="btn btn-primary">Capture Photo</button>
+          <button onclick="closeCameraModal()" class="btn" style="background:#ef4444; border:none; color:white;">Cancel</button>
+      </div>
+  </div>
+
+  <div id="mentorModal" class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal-content">
+          <img id="mImg" src="" class="modal-img">
+          <div id="mName" class="modal-name">Name</div>
+          <div id="mRole" class="modal-role">Role</div>
+          <div id="mBio" class="modal-bio">Bio</div>
+          <div id="mTags" class="modal-tags"></div>
+          <div id="bookingContainer"></div>
+      </div>
+  </div>
+
+  <script>
+    /* --- EXTENSIVE COURSE DATA WITH GFG REFERENCES (30+ Courses) --- */
+    const COURSES = [
+        // CORE CS
+        { id: 'dsa', title: '🧩 Data Structures & Algorithms', tag: "Core CS", refLink: "https://www.geeksforgeeks.org/data-structures/", modules: [{ title: "1. Arrays & Strings", content: "<h3>Arrays</h3><p>Fundamental blocks. Learn traversal, insertion, and deletion.</p>" }, { title: "2. Linked Lists", content: "<h3>Linked Lists</h3><p>Nodes connected by pointers. Efficient insertions.</p>" }, { title: "3. Trees & Graphs", content: "<h3>Hierarchical Data</h3><p>Trees for hierarchy, Graphs for networks.</p>" }], quiz: { q: "Time complexity of array access?", options: ["O(1)", "O(n)", "O(log n)"], answer: 0 } },
+        { id: 'os', title: '💻 Operating Systems', tag: "CS Fund", refLink: "https://www.geeksforgeeks.org/operating-systems/", modules: [{ title: "1. Process Mgmt", content: "<h3>Processes</h3><p>Scheduling algorithms like Round Robin.</p>" }, { title: "2. Memory Mgmt", content: "<h3>Memory</h3><p>Paging, segmentation, and virtual memory.</p>" }, { title: "3. Concurrency", content: "<h3>Threads</h3><p>Deadlocks and synchronization.</p>" }], quiz: { q: "Core of OS?", options: ["Shell", "Kernel", "GUI"], answer: 1 } },
+        { id: 'cn', title: '🌐 Computer Networks', tag: "CS Fund", refLink: "https://www.geeksforgeeks.org/computer-network-tutorials/", modules: [{ title: "1. OSI Model", content: "<h3>Layers</h3><p>7 Layers of OSI model explained.</p>" }, { title: "2. TCP/IP", content: "<h3>Protocols</h3><p>Transmission Control Protocol basics.</p>" }, { title: "3. IP Addressing", content: "<h3>Subnetting</h3><p>IPv4 vs IPv6.</p>" }], quiz: { q: "Protocol for web?", options: ["HTTP", "FTP", "SMTP"], answer: 0 } },
+        { id: 'dbms', title: '🗄️ DBMS & SQL', tag: "Data", refLink: "https://www.geeksforgeeks.org/dbms/", modules: [{ title: "1. SQL Basics", content: "<h3>Queries</h3><p>SELECT, INSERT, UPDATE, DELETE.</p>" }, { title: "2. Normalization", content: "<h3>Design</h3><p>1NF, 2NF, 3NF for database design.</p>" }, { title: "3. Transactions", content: "<h3>ACID Properties</h3><p>Atomicity, Consistency, Isolation, Durability.</p>" }], quiz: { q: "Command to fetch data?", options: ["GET", "SELECT", "FETCH"], answer: 1 } },
+        
+        // PROGRAMMING LANGUAGES
+        { id: 'python', title: '🐍 Python Masterclass', tag: "Coding", refLink: "https://www.geeksforgeeks.org/python-programming-language/", modules: [{ title: "1. Syntax", content: "<h3>Basics</h3><p>Variables, loops, and functions.</p>" }, { title: "2. OOP", content: "<h3>Classes</h3><p>Object Oriented Programming in Python.</p>" }, { title: "3. Libraries", content: "<h3>Modules</h3><p>Numpy, Pandas, and Matplotlib.</p>" }], quiz: { q: "Library for data?", options: ["Pandas", "React", "Vue"], answer: 0 } },
+        { id: 'java', title: '☕ Java Programming', tag: "Backend", refLink: "https://www.geeksforgeeks.org/java/", modules: [{ title: "1. Core Java", content: "<h3>JVM</h3><p>How Java works. Bytecode and JIT.</p>" }, { title: "2. Collections", content: "<h3>Framework</h3><p>ArrayList, HashMap, HashSet.</p>" }, { title: "3. Multithreading", content: "<h3>Concurrency</h3><p>Threads and Runnable interface.</p>" }], quiz: { q: "Keyword for inheritance?", options: ["extends", "implements", "inherits"], answer: 0 } },
+        { id: 'cpp', title: '⚡ C++ Programming', tag: "Core", refLink: "https://www.geeksforgeeks.org/c-plus-plus/", modules: [{ title: "1. Pointers", content: "<h3>Memory</h3><p>Direct memory access with * and &.</p>" }, { title: "2. STL", content: "<h3>Library</h3><p>Standard Template Library containers.</p>" }, { title: "3. OOP", content: "<h3>Concepts</h3><p>Classes, objects, and polymorphism.</p>" }], quiz: { q: "Symbol for address?", options: ["&", "*", "#"], answer: 0 } },
+        { id: 'js', title: '🟨 JavaScript Essentials', tag: "Web", refLink: "https://www.geeksforgeeks.org/javascript/", modules: [{ title: "1. ES6+", content: "<h3>Modern JS</h3><p>Arrow functions, destructuring, modules.</p>" }, { title: "2. Async", content: "<h3>Promises</h3><p>Async/Await and callbacks.</p>" }, { title: "3. DOM", content: "<h3>Manipulation</h3><p>Selecting and changing elements.</p>" }], quiz: { q: "Keyword for constant?", options: ["var", "let", "const"], answer: 2 } },
+        
+        // WEB DEVELOPMENT
+        { id: 'html', title: '📄 HTML5 & CSS3', tag: "Frontend", refLink: "https://www.geeksforgeeks.org/html-tutorial/", modules: [{ title: "1. Structure", content: "<h3>Tags</h3><p>Semantic HTML5 elements.</p>" }, { title: "2. Styling", content: "<h3>CSS</h3><p>Flexbox and Grid layouts.</p>" }, { title: "3. Responsive", content: "<h3>Media Queries</h3><p>Making sites mobile-friendly.</p>" }], quiz: { q: "Tag for largest heading?", options: ["h1", "head", "header"], answer: 0 } },
+        { id: 'react', title: '⚛️ React.js', tag: "Frontend", refLink: "https://www.geeksforgeeks.org/reactjs-tutorials/", modules: [{ title: "1. Components", content: "<h3>JSX</h3><p>Building reusable UI components.</p>" }, { title: "2. Hooks", content: "<h3>State</h3><p>useState and useEffect.</p>" }, { title: "3. Router", content: "<h3>Navigation</h3><p>React Router basics.</p>" }], quiz: { q: "Hook for side effects?", options: ["useEffect", "useState", "useContext"], answer: 0 } },
+        { id: 'node', title: '🟢 Node.js', tag: "Backend", refLink: "https://www.geeksforgeeks.org/nodejs/", modules: [{ title: "1. Runtime", content: "<h3>V8 Engine</h3><p>Running JS outside the browser.</p>" }, { title: "2. Express", content: "<h3>Framework</h3><p>Building REST APIs.</p>" }, { title: "3. NPM", content: "<h3>Packages</h3><p>Managing dependencies.</p>" }], quiz: { q: "Default package manager?", options: ["pip", "npm", "gem"], answer: 1 } },
+        { id: 'angular', title: '🅰️ Angular', tag: "Frontend", refLink: "https://www.geeksforgeeks.org/angular-7-tutorial/", modules: [{ title: "1. TypeScript", content: "<h3>Superset</h3><p>Typed JavaScript basics.</p>" }, { title: "2. Components", content: "<h3>Structure</h3><p>Decorators and templates.</p>" }, { title: "3. Services", content: "<h3>DI</h3><p>Dependency Injection.</p>" }], quiz: { q: "Language used in Angular?", options: ["JS", "TypeScript", "Dart"], answer: 1 } },
+
+        // ADVANCED TECH
+        { id: 'ml', title: '🤖 Machine Learning', tag: "AI", refLink: "https://www.geeksforgeeks.org/machine-learning/", modules: [{ title: "1. Supervised", content: "<h3>Regression</h3><p>Predicting continuous values.</p>" }, { title: "2. Unsupervised", content: "<h3>Clustering</h3><p>K-Means and PCA.</p>" }, { title: "3. Neural Nets", content: "<h3>Deep Learning</h3><p>Basics of ANN and CNN.</p>" }], quiz: { q: "Library for ML?", options: ["Scikit-learn", "Django", "Flask"], answer: 0 } },
+        { id: 'dl', title: '🧠 Deep Learning', tag: "AI", refLink: "https://www.geeksforgeeks.org/deep-learning-tutorial/", modules: [{ title: "1. Tensor", content: "<h3>Math</h3><p>Matrix operations.</p>" }, { title: "2. CNN", content: "<h3>Vision</h3><p>Convolutional Neural Networks.</p>" }, { title: "3. RNN", content: "<h3>Sequence</h3><p>Recurrent Neural Networks.</p>" }], quiz: { q: "Framework by Google?", options: ["PyTorch", "TensorFlow", "Keras"], answer: 1 } },
+        { id: 'nlp', title: '🗣️ NLP Basics', tag: "AI", refLink: "https://www.geeksforgeeks.org/natural-language-processing-nlp-tutorial/", modules: [{ title: "1. Text Prep", content: "<h3>Cleaning</h3><p>Tokenization and Stemming.</p>" }, { title: "2. Models", content: "<h3>BERT</h3><p>Transformer models.</p>" }, { title: "3. Sentiment", content: "<h3>Analysis</h3><p>Classifying text emotion.</p>" }], quiz: { q: "Process of breaking text?", options: ["Tokenization", "Parsing", "Lexing"], answer: 0 } },
+        
+        // DEVOPS & CLOUD
+        { id: 'git', title: '🐙 Git & GitHub', tag: "DevOps", refLink: "https://www.geeksforgeeks.org/git-tutorial/", modules: [{ title: "1. Basics", content: "<h3>Commands</h3><p>init, add, commit, push.</p>" }, { title: "2. Branching", content: "<h3>Workflow</h3><p>Merging and pull requests.</p>" }, { title: "3. CI/CD", content: "<h3>Actions</h3><p>Automated workflows.</p>" }], quiz: { q: "Command to copy repo?", options: ["clone", "fork", "pull"], answer: 0 } },
+        { id: 'docker', title: '🐳 Docker', tag: "DevOps", refLink: "https://www.geeksforgeeks.org/docker-tutorial/", modules: [{ title: "1. Containers", content: "<h3>Isolation</h3><p>OS-level virtualization.</p>" }, { title: "2. Images", content: "<h3>Dockerfile</h3><p>Building custom images.</p>" }, { title: "3. Compose", content: "<h3>Multi-container</h3><p>Orchestrating services.</p>" }], quiz: { q: "File to build image?", options: ["Dockerfile", "Containerfile", "Buildfile"], answer: 0 } },
+        { id: 'aws', title: '☁️ AWS Cloud', tag: "Cloud", refLink: "https://www.geeksforgeeks.org/aws-tutorial/", modules: [{ title: "1. EC2", content: "<h3>Compute</h3><p>Virtual servers in the cloud.</p>" }, { title: "2. S3", content: "<h3>Storage</h3><p>Object storage for files.</p>" }, { title: "3. IAM", content: "<h3>Security</h3><p>Identity and Access Management.</p>" }], quiz: { q: "Service for storage?", options: ["EC2", "S3", "RDS"], answer: 1 } },
+        
+        // MOBILE & OTHERS
+        { id: 'android', title: '📱 Android Dev', tag: "Mobile", refLink: "https://www.geeksforgeeks.org/android-tutorial/", modules: [{ title: "1. Kotlin", content: "<h3>Language</h3><p>Modern Android development.</p>" }, { title: "2. Layouts", content: "<h3>UI</h3><p>XML and Jetpack Compose.</p>" }, { title: "3. Gradle", content: "<h3>Build</h3><p>Dependency management.</p>" }], quiz: { q: "Official language?", options: ["Java", "Kotlin", "C#"], answer: 1 } },
+        { id: 'flutter', title: '🐦 Flutter', tag: "Mobile", refLink: "https://www.geeksforgeeks.org/flutter-tutorial/", modules: [{ title: "1. Dart", content: "<h3>Language</h3><p>Basics of Dart programming.</p>" }, { title: "2. Widgets", content: "<h3>UI</h3><p>Everything is a widget.</p>" }, { title: "3. State", content: "<h3>Management</h3><p>Provider and Riverpod.</p>" }], quiz: { q: "Language used?", options: ["Java", "Dart", "Swift"], answer: 1 } },
+        { id: 'blockchain', title: '🔗 Blockchain', tag: "Web3", refLink: "https://www.geeksforgeeks.org/blockchain/", modules: [{ title: "1. Basics", content: "<h3>Distributed</h3><p>Ledgers and consensus.</p>" }, { title: "2. Crypto", content: "<h3>Hashing</h3><p>SHA-256 and public keys.</p>" }, { title: "3. Smart Contracts", content: "<h3>Code</h3><p>Self-executing contracts.</p>" }], quiz: { q: "Platform for contracts?", options: ["Bitcoin", "Ethereum", "Dogecoin"], answer: 1 } },
+        
+        // MORE TECH
+        { id: 'sys-design', title: '🏗️ System Design', tag: "Arch", refLink: "https://www.geeksforgeeks.org/system-design-tutorial/", modules: [{ title: "1. Load Balancing", content: "<h3>Traffic</h3><p>Distributing requests.</p>" }, { title: "2. Caching", content: "<h3>Speed</h3><p>Redis and CDNs.</p>" }, { title: "3. Databases", content: "<h3>Sharding</h3><p>SQL vs NoSQL scaling.</p>" }], quiz: { q: "Improve read speed?", options: ["Caching", "Backup", "Logging"], answer: 0 } },
+        { id: 'cyber', title: '🔐 Cybersecurity', tag: "Sec", refLink: "https://www.geeksforgeeks.org/cyber-security-tutorial/", modules: [{ title: "1. Threats", content: "<h3>Attacks</h3><p>Phishing, malware, DDoS.</p>" }, { title: "2. Cryptography", content: "<h3>Encryption</h3><p>Symmetric and Asymmetric.</p>" }, { title: "3. Network", content: "<h3>Security</h3><p>Firewalls and VPNs.</p>" }], quiz: { q: "Secure HTTP?", options: ["HTTP", "HTTPS", "FTP"], answer: 1 } },
+        { id: 'linux', title: '🐧 Linux OS', tag: "DevOps", refLink: "https://www.geeksforgeeks.org/linux-tutorial/", modules: [{ title: "1. CLI", content: "<h3>Terminal</h3><p>Bash commands.</p>" }, { title: "2. Permissions", content: "<h3>Security</h3><p>Chmod and chown.</p>" }, { title: "3. Scripting", content: "<h3>Bash</h3><p>Automating tasks.</p>" }], quiz: { q: "Superuser command?", options: ["admin", "sudo", "root"], answer: 1 } },
+        { id: 'go', title: '🐹 Go Language', tag: "Backend", refLink: "https://www.geeksforgeeks.org/golang/", modules: [{ title: "1. Syntax", content: "<h3>Basics</h3><p>Variables and functions.</p>" }, { title: "2. Concurrency", content: "<h3>Goroutines</h3><p>Lightweight threads.</p>" }, { title: "3. Web", content: "<h3>Server</h3><p>Building HTTP servers.</p>" }], quiz: { q: "Concurrency feature?", options: ["Threads", "Goroutines", "Async"], answer: 1 } },
+        { id: 'rust', title: '🦀 Rust', tag: "System", refLink: "https://www.geeksforgeeks.org/rust-programming-language/", modules: [{ title: "1. Ownership", content: "<h3>Memory</h3><p>Safety without GC.</p>" }, { title: "2. Borrowing", content: "<h3>References</h3><p>Mutable vs Immutable.</p>" }, { title: "3. Cargo", content: "<h3>Build</h3><p>Package manager.</p>" }], quiz: { q: "Memory safety concept?", options: ["Ownership", "GC", "Manual"], answer: 0 } },
+        { id: 'swift', title: '🍎 Swift iOS', tag: "Mobile", refLink: "https://www.geeksforgeeks.org/swift-programming-language/", modules: [{ title: "1. Basics", content: "<h3>Syntax</h3><p>Variables and optionals.</p>" }, { title: "2. UI", content: "<h3>SwiftUI</h3><p>Declarative UI.</p>" }, { title: "3. Data", content: "<h3>CoreData</h3><p>Local storage.</p>" }], quiz: { q: "UI Framework?", options: ["UIKit", "SwiftUI", "Cocoa"], answer: 1 } },
+        { id: 'tableau', title: '📊 Tableau', tag: "Data", refLink: "https://www.geeksforgeeks.org/tableau-tutorial/", modules: [{ title: "1. Interface", content: "<h3>Basics</h3><p>Drag and drop.</p>" }, { title: "2. Charts", content: "<h3>Vis</h3><p>Bar, Line, and Pie charts.</p>" }, { title: "3. Dashboards", content: "<h3>Stories</h3><p>Interactive reports.</p>" }], quiz: { q: "Main purpose?", options: ["Coding", "Visualization", "Database"], answer: 1 } },
+        { id: 'excel', title: '📗 Excel Data', tag: "Data", refLink: "https://www.geeksforgeeks.org/excel-tutorial/", modules: [{ title: "1. Formulas", content: "<h3>Math</h3><p>Sum, Average, Vlookup.</p>" }, { title: "2. Pivot", content: "<h3>Tables</h3><p>Summarizing data.</p>" }, { title: "3. Macros", content: "<h3>VBA</h3><p>Automation.</p>" }], quiz: { q: "Lookup function?", options: ["SEARCH", "VLOOKUP", "FIND"], answer: 1 } },
+        { id: 'azure', title: '☁️ Azure', tag: "Cloud", refLink: "https://www.geeksforgeeks.org/microsoft-azure/", modules: [{ title: "1. Basics", content: "<h3>Cloud</h3><p>Regions and availability.</p>" }, { title: "2. VM", content: "<h3>Compute</h3><p>Virtual Machines.</p>" }, { title: "3. Storage", content: "<h3>Blob</h3><p>File storage.</p>" }], quiz: { q: "Microsoft's cloud?", options: ["AWS", "Azure", "GCP"], answer: 1 } }
+    ];
+
+    const MENTORS = [
+      { name: "Sarah J.", role: "AI Lead, Google", img: "https://i.pravatar.cc/150?u=1", bio: "Sarah leads Responsible AI at Google.", tags: ["Ethics", "Deep Learning"], slots: ["10:00 AM", "2:00 PM"] },
+      { name: "David K.", role: "ML Ops, Netflix", img: "https://i.pravatar.cc/150?u=2", bio: "David built RecSys infra at Netflix.", tags: ["MLOps", "Scale"], slots: ["9:00 AM", "3:00 PM"] },
+      { name: "Priya R.", role: "Data Scientist, Uber", img: "https://i.pravatar.cc/150?u=3", bio: "Priya works on dynamic pricing algorithms.", tags: ["Algorithms", "Stats"], slots: ["1:00 PM", "5:00 PM"] }
+    ];
+
+    // LIVE TREND DATA SETS (24h Rotation)
+    const TREND_GROUPS = [
+        [
+            { src: "TechCrunch", title: "AI Startups raise $50B in Q1", url: "https://techcrunch.com/category/artificial-intelligence/" },
+            { src: "Wired", title: "ML Engineering Jobs up 200%", url: "https://www.wired.com/tag/artificial-intelligence/" },
+            { src: "Verge", title: "New AI Regulations in EU", url: "https://www.theverge.com/tech" }
+        ],
+        [
+            { src: "TheNextWeb", title: "Python overtakes JS in popularity", url: "https://thenextweb.com/topic/artificial-intelligence" },
+            { src: "Bloomberg", title: "Tech giants hiring for 'AI Ethics'", url: "https://www.bloomberg.com/technology" },
+            { src: "ArsTechnica", title: "Rust foundation announces new grant", url: "https://arstechnica.com/information-technology/" }
+        ],
+        [
+            { src: "MIT Tech", title: "Breakthrough in Quantum Computing", url: "https://www.technologyreview.com/topic/artificial-intelligence/" },
+            { src: "VentureBeat", title: "Generative AI market to hit $1T", url: "https://venturebeat.com/category/ai/" },
+            { src: "InfoQ", title: "Kubernetes adoption reaches 80%", url: "https://www.infoq.com/" }
+        ]
+    ];
+
+    /* --- VARIABLES & USER STATE --- */
+    let isLoginMode = true;
+    let chatHistory = [];
+    let currentCourse = null;
+    let cameraStream = null;
+    let userProfile = { name: "Guest", email: "guest@skillpath.ai", phone: "", location: "", title: "Learner", completedCourses: [], xp: 0 };
+
+    /* --- THEME LOGIC (NEW) --- */
+    function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    }
+
+    /* --- AUTH LOGIC --- */
+    function toggleAuthMode() {
+        isLoginMode = !isLoginMode;
+        document.getElementById('authTitle').innerText = isLoginMode ? "Welcome back" : "Create Account";
+        document.getElementById('submitBtn').innerText = isLoginMode ? "Log In" : "Sign Up";
+        document.getElementById('toggleText').innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
+        document.getElementById('toggleLink').innerText = isLoginMode ? "Sign up" : "Log in";
+    }
+    
+    function handleLoginClick() {
+        const u = document.getElementById('loginUser').value.trim();
+        const p = document.getElementById('loginPass').value.trim();
+        const err = document.getElementById('loginError');
+        err.style.display = 'none';
+        if (isLoginMode) {
+            if(u.toLowerCase() === "admin" && p === "12345") {
+                userProfile.name = "Raghav (Admin)";
+                userProfile.email = "raghav@skillpath.ai";
+                userProfile.phone = "+91 98765 43210";
+                userProfile.location = "Bangalore, India";
+                userProfile.title = "Full Stack Developer";
+                enterDashboard();
+            } else { err.innerText = "Try 'admin' & '12345'"; err.style.display = 'block'; }
+        } else {
+            if(u && p) { alert("Created! Logging in..."); enterDashboard(); }
+            else { err.innerText = "Fill all fields"; err.style.display = 'block'; }
+        }
+    }
+
+    function handleGoogleLogin() { window.location.href = "http://localhost:3000/auth/google"; }
+
+    function enterDashboard() { 
+        document.getElementById('login-view').classList.add('hide'); 
+        document.getElementById('app-view').classList.add('active-app');
+        loadProfile(); 
+        updateDashboard(); 
+    }
+    
+    function logout() { window.location.href = "/api/logout"; }
+
+    /* --- PROFILE & DASHBOARD LOGIC --- */
+    function loadProfile() {
+        // Load data into UI
+        document.getElementById('profileNameInput').value = userProfile.name;
+        document.getElementById('profileEmailInput').value = userProfile.email;
+        
+        // Check LocalStorage
+        const storedName = localStorage.getItem('sp_name');
+        const storedPhone = localStorage.getItem('sp_phone');
+        const storedLoc = localStorage.getItem('sp_loc');
+        const storedTitle = localStorage.getItem('sp_title');
+        const storedPFP = localStorage.getItem('sp_pfp_blob');
+        
+        if(storedName) userProfile.name = storedName;
+        if(storedPhone) userProfile.phone = storedPhone;
+        if(storedLoc) userProfile.location = storedLoc;
+        if(storedTitle) userProfile.title = storedTitle;
+        if(storedPFP) document.getElementById('profileImg').src = storedPFP;
+
+        document.getElementById('profileNameInput').value = userProfile.name;
+        document.getElementById('profilePhone').value = userProfile.phone;
+        document.getElementById('profileLoc').value = userProfile.location;
+        document.getElementById('profileTitle').value = userProfile.title;
+    }
+
+    function saveProfile() {
+        userProfile.name = document.getElementById('profileNameInput').value;
+        userProfile.phone = document.getElementById('profilePhone').value;
+        userProfile.location = document.getElementById('profileLoc').value;
+        userProfile.title = document.getElementById('profileTitle').value;
+        localStorage.setItem('sp_name', userProfile.name);
+        localStorage.setItem('sp_phone', userProfile.phone);
+        localStorage.setItem('sp_loc', userProfile.location);
+        localStorage.setItem('sp_title', userProfile.title);
+        
+        // Update strength
+        updateDashboard();
+        
+        alert("✅ Profile Updated Successfully!");
+    }
+
+    function updatePFP(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('profileImg').src = e.target.result;
+                localStorage.setItem('sp_pfp_blob', e.target.result);
+                updateDashboard();
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    /* --- CAMERA LOGIC --- */
+    async function openCameraModal() {
+        const modal = document.getElementById('cameraModal');
+        const video = document.getElementById('camVideo');
+        modal.style.display = 'flex';
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = cameraStream;
+        } catch (e) {
+            alert("Unable to access camera: " + e.message);
+            closeCameraModal();
+        }
+    }
+
+    function closeCameraModal() {
+        document.getElementById('cameraModal').style.display = 'none';
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+    }
+
+    function capturePhoto() {
+        const video = document.getElementById('camVideo');
+        const canvas = document.getElementById('camCanvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/png');
+        document.getElementById('profileImg').src = dataUrl;
+        localStorage.setItem('sp_pfp_blob', dataUrl);
+        updateDashboard();
+        closeCameraModal();
+    }
+
+    function updateDashboard() {
+        // 1. Basic Stats
+        document.getElementById('dashCompleted').innerText = userProfile.completedCourses.length;
+        document.getElementById('dashXP').innerText = userProfile.xp;
+        document.getElementById('dashSkills').innerText = userProfile.completedCourses.length * 3; 
+
+        // 2. Profile Strength Calculation
+        let score = 0;
+        if (userProfile.name && userProfile.name !== "Guest") score += 20;
+        if (userProfile.phone) score += 20;
+        if (userProfile.location) score += 20;
+        if (userProfile.title && userProfile.title !== "Learner") score += 20;
+        if (localStorage.getItem('sp_pfp_blob')) score += 10;
+        if (userProfile.completedCourses.length > 0) score += 10;
+
+        if(score > 100) score = 100;
+
+        // 3. Update Widget
+        document.getElementById('progText').innerText = score + "%";
+        document.getElementById('progBar').style.width = score + "%";
+        
+        // Color coding
+        const bar = document.getElementById('progBar');
+        if(score < 40) bar.style.background = 'var(--error)';
+        else if(score < 70) bar.style.background = 'var(--warning)';
+        else bar.style.background = 'var(--success)';
+    }
+
+    function nav(pageId) {
+        document.querySelectorAll('.view-section').forEach(el => { el.classList.add('hide'); el.classList.remove('fade-in'); });
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        const target = document.getElementById('view-' + pageId);
+        if (target) { target.classList.remove('hide'); void target.offsetWidth; target.classList.add('fade-in'); }
+        const btn = document.getElementById('btn-' + pageId);
+        if (btn) btn.classList.add('active');
+        
+        if(pageId === 'path') loadAIPath();
+        if(pageId === 'jobs') loadAIJobs();
+        if(pageId === 'mentorship') loadMentors();
+        if(pageId === 'trending') loadTrending();
+        if(pageId === 'profile') loadProfile();
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chatInput');
+      const box = document.getElementById('chatBox');
+      const text = input.value;
+      if(!text) return;
+      box.innerHTML += `<div class="msg msg-user">${text}</div>`;
+      input.value = '';
+      chatHistory.push({ role: 'user', content: text });
+      try {
+        const res = await fetch('http://localhost:3000/api/interview', {
+            method: 'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ role: "General", message: text, history: chatHistory })
+        });
+        const data = await res.json();
+        chatHistory.push({ role: 'ai', content: data.reply });
+        box.innerHTML += `<div class="msg msg-ai">${data.reply}</div>`;
+        box.scrollTop = box.scrollHeight;
+      } catch(e) { 
+          box.innerHTML += `<div class="msg msg-ai" style="color:var(--error)">Server Error. Is Node running?</div>`;
+      }
+    }
+
+    /* --- UPDATED RESUME SCANNER: TEXT INPUT + ATS KEYWORDS --- */
+    async function scanResume() {
+        const resumeText = document.getElementById('resumeText').value;
+        const jobDesc = document.getElementById('jobDesc').value;
+        const resBox = document.getElementById('resumeResult');
+        const loader = document.getElementById('resumeLoader');
+
+        if(resumeText.length < 50) return alert("Please paste your resume text first.");
+
+        loader.classList.remove('hide');
+        resBox.classList.add('hide');
+
+        try {
+            // Send text to the "interview" endpoint which handles general AI requests
+            // This avoids modifying the backend "resume-scan" route which expects a file.
+            const prompt = `
+                Act as an ATS Scanner.
+                Resume Text: "${resumeText.substring(0, 3000).replace(/"/g, "'")}"
+                Job Description: "${jobDesc.substring(0, 1000).replace(/"/g, "'")}"
+                
+                Analyze the resume against the job description.
+                Identify keywords present in JD but missing in resume.
+                Give a match score out of 100.
+                
+                Return ONLY valid JSON in this format:
+                {
+                    "score": 75,
+                    "missing_keywords": ["Java", "AWS", "Agile"],
+                    "feedback": "Your summary is weak. Add more metrics."
+                }
+            `;
+
+            const res = await fetch('http://localhost:3000/api/interview', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ role: "ATS Scanner", message: prompt, history: [] })
+            });
+
+            const data = await res.json();
+            
+            // Clean up JSON from markdown if present
+            let cleanJson = data.reply.replace(/```json/g, '').replace(/```/g, '').trim();
+            const match = cleanJson.match(/\{[\s\S]*\}/);
+            if (match) cleanJson = match[0];
+            
+            const result = JSON.parse(cleanJson);
+
+            // Update UI
+            loader.classList.add('hide');
+            resBox.classList.remove('hide');
+            
+            document.getElementById('atsScoreDisplay').innerText = result.score + "/100";
+            document.getElementById('atsScoreFill').style.width = result.score + "%";
+            document.getElementById('atsScoreFill').style.background = result.score > 70 ? 'var(--success)' : (result.score > 40 ? 'var(--warning)' : 'var(--error)');
+            
+            const missingHtml = result.missing_keywords.map(k => `<span class="keyword-badge keyword-missing">${k}</span>`).join('');
+            document.getElementById('missingKeywords').innerHTML = missingHtml || "None! Great job.";
+            
+            document.getElementById('resumeFeedback').innerText = result.feedback;
+
+        } catch (e) { 
+            console.log(e);
+            loader.classList.add('hide');
+            alert("Error scanning resume. Please try again.");
+        }
+    }
+
+    async function negotiateSalary() {
+        const role = document.getElementById('salRole').value;
+        const offer = document.getElementById('salOffer').value;
+        const exp = document.getElementById('salExp').value;
+        const box = document.getElementById('salaryResult');
+        box.innerHTML = "Generating Professional Script...";
+        try {
+            const res = await fetch('http://localhost:3000/api/salary-negotiate', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ role, offer, experience: exp })
+            });
+            const data = await res.json();
+            box.innerHTML = data.script.replace(/\n/g, '<br>');
+            box.style.color = "white";
+            box.style.fontStyle = "normal";
+        } catch (e) { box.innerHTML = "Server Error"; }
+    }
+
+    /* --- REALISTIC PATH LOGIC (UPDATED) --- */
+    async function loadAIPath() {
+        const loader = document.getElementById('pathLoader');
+        const container = document.getElementById('pathContent');
+        const role = userProfile.title || "Software Engineer";
+        
+        loader.classList.remove('hide');
+        container.innerHTML = '';
+        
+        try {
+            const res = await fetch('http://localhost:3000/api/interview', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ 
+                    role: role, 
+                    message: `Generate a 5-step detailed learning path for a ${role}. Format: Just the steps, numbered 1-5, with a brief description.`, 
+                    history: [] 
+                }) 
+            });
+            const data = await res.json();
+            const steps = data.reply.split(/\d\.\s/).filter(s => s.length > 5).slice(0, 5);
+            loader.classList.add('hide');
+            const cleanSteps = steps.length >= 3 ? steps : [
+                "Master Fundamentals: Learn the core syntax and basic concepts.",
+                "Build Projects: Apply knowledge by building 2-3 real-world apps.",
+                "Advanced Concepts: Dive into system design and optimization.",
+                "Portfolio Polish: Refine your resume and GitHub profile.",
+                "Interview Prep: Practice LeetCode and behavioral questions."
+            ];
+
+            container.innerHTML = cleanSteps.map((step, i) => {
+                const topic = step.split(':')[0] || "Topic";
+                const searchQuery = encodeURIComponent(`${role} ${topic} best tutorial`);
+                return `
+                <div class="path-step-card">
+                    <div class="path-step-num">${i+1}</div>
+                    <h3 style="margin:0 0 5px 0; color:var(--text-main);">${topic}</h3>
+                    <p style="color:var(--text-muted); font-size:14px; margin:0;">${step.replace(topic+':', '').trim()}</p>
+                    <a href="https://www.google.com/search?q=${searchQuery}" target="_blank" class="resource-btn">📚 Find Best Resources</a>
+                </div>
+            `}).join('');
+        } catch (e) { 
+            loader.classList.add('hide'); 
+            container.innerHTML = `<div class="card" style="padding:15px; color:var(--text-main);">Mock Path for ${role}:<br>1. Master Fundamentals<br>2. Build Projects<br>3. Apply & Network</div>`; 
+        }
+    }
+
+    async function searchJobsBySkills() {
+        const skills = document.getElementById('skillSearchInput').value;
+        const loader = document.getElementById('skillJobLoader');
+        const container = document.getElementById('skillJobResults');
+        if (!skills) return alert("Please enter some skills.");
+        loader.classList.remove('hide');
+        container.innerHTML = '';
+        try {
+            const res = await fetch('http://localhost:3000/api/find-jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: skills }) });
+            if(!res.ok) throw new Error("Server Error");
+            const jobs = await res.json();
+            loader.classList.add('hide');
+            if (jobs.length === 0) { container.innerHTML = '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">No jobs found. Try different skills.</div>'; return; }
+            container.innerHTML = jobs.map(job => `
+                <div class="card" style="padding:20px; border-left: 4px solid var(--secondary);">
+                    <h3 style="margin-top:0; color:var(--text-main);">${job.title}</h3>
+                    <div style="color:var(--primary); font-weight:bold; font-size:14px; margin-bottom:5px;">${job.company}</div>
+                    <div style="color:var(--text-muted); font-size:13px; margin-bottom:15px;">📍 ${job.location} • 💰 ${job.salary}</div>
+                    <a href="https://www.google.com/search?q=${encodeURIComponent(job.title + ' jobs')}" target="_blank" class="btn btn-primary" style="font-size:12px; padding:8px 16px; text-decoration:none;">Apply Now ↗</a>
+                </div>
+            `).join('');
+        } catch (e) { loader.classList.add('hide'); container.innerHTML = `<div style="color:var(--error);">Failed to fetch jobs. Is server running?</div>`; }
+    }
+
+    async function loadAIJobs() {
+        const loader = document.getElementById('jobsLoader');
+        const container = document.getElementById('jobsContent');
+        if(container.innerHTML.includes("Apply")) return; 
+        loader.classList.remove('hide');
+        try {
+            const res = await fetch('http://localhost:3000/api/find-jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: "Software" }) });
+            if(!res.ok) throw new Error("Server");
+            const data = await res.json();
+            loader.classList.add('hide');
+            container.innerHTML = data.map(job => `<div style="background:var(--card-bg); padding:20px; border-radius:10px; border-left:4px solid #10b981;"><h4 style="color:var(--text-main); margin:0 0 5px 0;">${job.title}</h4><div style="color:var(--primary); font-weight:bold; font-size:13px;">${job.company}</div><div style="color:var(--text-muted); font-size:12px; margin-top:5px;">📍 ${job.location} • 💰 ${job.salary}</div><a href="https://www.google.com/search?q=${encodeURIComponent(job.title + ' jobs')}" target="_blank" class="btn" style="margin-top:10px; padding:8px; font-size:12px; text-decoration:none;">Apply Now</a></div>`).join('');
+        } catch (e) { loader.classList.add('hide'); container.innerHTML = `<p style="color:#ef4444">Server Offline. Mocking Jobs...</p><div class="card" style="padding:15px; color:var(--text-main);">Senior Dev @ TechCorp</div>`; }
+    }
+
+    function findMatchedJobs() { searchJobsBySkills(); } // Redirect old button
+    function loadMentors() { const container = document.getElementById('fullMentorList'); if(container.innerHTML.trim() !== "") return; container.innerHTML = MENTORS.map((m, index) => `<div class="card" style="padding:15px; display:flex; align-items:center; gap:15px; margin-bottom:10px;"><img src="${m.img}" style="width:40px; height:40px; border-radius:50%;"><div><div style="color:var(--text-main); font-weight:700;">${m.name}</div><div style="color:var(--text-muted); font-size:12px;">${m.role}</div></div><button class="btn btn-primary" style="width:auto; margin-left:auto; padding:5px 15px; font-size:12px;" onclick="showMentor(${index})">Book</button></div>`).join(''); }
+
+    function renderTrendList() {
+        const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+        const groupIndex = dayOfYear % TREND_GROUPS.length;
+        const todaysTrends = TREND_GROUPS[groupIndex];
+        
+        document.getElementById('trendList').innerHTML = todaysTrends.map(t => `
+            <a href="${t.url}" target="_blank" class="trend-link">
+                <span class="trend-source">${t.src}</span>
+                ${t.title}
+            </a>
+        `).join('');
+
+        // Also update ticker if needed
+        const tickerHtml = todaysTrends.map(t => `<a href="${t.url}" target="_blank" class="ticker-item">📢 ${t.title}</a>`).join('');
+        document.getElementById('liveTicker').innerHTML = tickerHtml + tickerHtml; // duplicate for smooth scrolling
+    }
+
+    /* --- LEARNING ENGINE (UPDATED) --- */
+    function loadTrending() {
+        const grid = document.getElementById('trendingGrid');
+        grid.innerHTML = COURSES.map((c, i) => `
+            <div class="card course-card" onclick="openCourse(${i})" style="padding:20px; cursor:pointer; border-left:4px solid var(--primary);">
+                <span class="tag">${c.tag}</span>
+                <h3 style="color:var(--text-main); font-size:18px; margin-top:10px;">${c.title}</h3>
+                <p style="color:var(--text-muted); font-size:13px;">${c.modules.length} Modules • Includes Quiz</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                    <button class="btn" style="padding:8px 15px; font-size:12px;">Start Learning</button>
+                    ${userProfile.completedCourses.includes(c.id) ? '<span style="color:var(--success); font-weight:bold;">✓ Completed</span>' : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.openCourse = function(index) {
+        nav('learning');
+        currentCourse = COURSES[index];
+        document.getElementById('playerCourseTitle').innerText = currentCourse.title;
+        
+        // Update Ref Button
+        const refBtn = document.getElementById('courseRefBtn');
+        if(currentCourse.refLink) {
+            refBtn.href = currentCourse.refLink;
+            refBtn.style.display = 'flex';
+        } else {
+            refBtn.style.display = 'none';
+        }
+        
+        // Load Modules List
+        const list = document.getElementById('moduleList');
+        list.innerHTML = currentCourse.modules.map((m, i) => `
+            <button class="module-btn ${i===0?'active':''}" onclick="loadModule(${i}, this)">${m.title}</button>
+        `).join('') + `<button class="module-btn" style="color:var(--accent-glow); font-weight:bold;" onclick="loadQuiz(this)">📝 Final Quiz</button>`;
+        
+        // Load First Module
+        loadModule(0, list.children[0]);
+    }
+
+    window.loadModule = function(index, btn) {
+        document.querySelectorAll('.module-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        document.getElementById('quizArea').classList.add('hide');
+        document.getElementById('learnContent').innerHTML = currentCourse.modules[index].content;
+        document.getElementById('learnContent').classList.remove('hide');
+    }
+
+    window.loadQuiz = function(btn) {
+        document.querySelectorAll('.module-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        
+        document.getElementById('learnContent').classList.add('hide');
+        const qa = document.getElementById('quizArea');
+        qa.classList.remove('hide');
+        
+        const qData = currentCourse.quiz;
+        document.getElementById('quizQuestion').innerText = qData.q;
+        const opts = document.getElementById('quizOptions'); opts.innerHTML = '';
+        document.getElementById('quizFeedback').innerText = "";
+        
+        qData.options.forEach((opt, i) => {
+            const b = document.createElement('div'); b.className = 'quiz-option'; b.innerText = opt;
+            b.onclick = () => {
+                if(i === qData.answer) {
+                    b.classList.add('correct');
+                    document.getElementById('quizFeedback').innerText = "✅ Correct! +100 XP";
+                    document.getElementById('quizFeedback').style.color = "#10b981";
+                    
+                    // REAL COMPLETION LOGIC
+                    if(!userProfile.completedCourses.includes(currentCourse.id)) {
+                        userProfile.completedCourses.push(currentCourse.id);
+                        userProfile.xp += 100;
+                        updateDashboard();
+                        alert("🎉 Course Completed! Dashboard Updated.");
+                    }
+                } else {
+                    b.classList.add('wrong');
+                    document.getElementById('quizFeedback').innerText = "❌ Incorrect. Try again.";
+                    document.getElementById('quizFeedback').style.color = "#ef4444";
+                }
+            };
+            opts.appendChild(b);
+        });
+    }
+
+    window.onload = async function() {
+        renderTrendList(); // Load today's trends
+        
+        const mHtml = MENTORS.map((m, index) => `<div class="card" onclick="showMentor(${index})" style="padding:15px; display:flex; align-items:center; gap:10px; margin-bottom:0; cursor:pointer;"><img src="${m.img}" style="width:40px;height:40px;border-radius:50%;"><div><div style="color:var(--text-main);font-weight:bold;">${m.name}</div><div style="font-size:12px;color:var(--text-muted);">${m.role}</div></div></div>`).join('');
+        document.getElementById('homeMentorGrid').innerHTML = mHtml;
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('loggedin') === 'true') {
+            try {
+                const res = await fetch('/api/current_user');
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ Welcome back, " + data.user.username);
+                    userProfile.name = data.user.username; userProfile.email = data.user.email;
+                    if(data.user.completedCourses) userProfile.completedCourses = data.user.completedCourses;
+                    document.getElementById('login-view').classList.add('hide');
+                    document.getElementById('app-view').classList.add('active-app');
+                    loadProfile(); updateDashboard();
+                }
+            } catch (e) { console.log("Login check failed"); }
+        }
+    }
+  </script>
+</body>
+</html>
