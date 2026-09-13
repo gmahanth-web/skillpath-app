@@ -1,121 +1,122 @@
-// server.js - Auto-Detect & Select Best Groq Model (Firebase handles auth client-side now)
+// server.js - Auto-Detect & Select Best Groq Model (with automatic fallback on failure)
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
-const multer = require('multer');
-const pdfParse = require('pdf-parse');
-const path = require('path');
+const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(cors());
+app.use(express.json());
+
 // --- 1. CONFIGURATION ---
-// No hardcoded fallbacks — set these in Render's Environment tab.
-// (Any key that was previously hardcoded here should be treated as leaked and rotated.)
+// Never hardcode a fallback key here. Fail loudly instead so a missing
+// env var is obvious in the logs rather than silently using a leaked key.
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 if (!GROQ_API_KEY) {
-    console.error("❌ GROQ_API_KEY is not set. Set it in Render's Environment tab.");
+    console.error("❌ GROQ_API_KEY is not set. Add it in your environment (e.g. Render's Environment tab).");
 }
 
-// --- 2. GLOBAL VARIABLE FOR MODEL ---
-// llama3-8b-8192, llama3-70b-8192, llama-3.1-70b-versatile, and llama-3.3-70b-versatile
-// are all decommissioned by Groq. Default to a currently-live model instead.
-let ACTIVE_MODEL = "llama-3.1-8b-instant";
+// --- 2. MODEL LIST ---
+// Ordered by preference. Only models actually usable on a standard key belong
+// here — Enterprise-tier models (currently llama-3.1-8b-instant and
+// llama-3.3-70b-versatile) will 404/403 unless your account has that access,
+// so they're kept as long-shot entries at the end, not first.
+const MODEL_PRIORITY = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "moonshotai/kimi-k2-instruct",
+    "qwen/qwen3-32b",
+    "llama-3.3-70b-versatile",   // Enterprise-only as of Sep 2026 — kept in case your account has access
+    "llama-3.1-8b-instant"       // Enterprise-only as of Sep 2026 — kept in case your account has access
+];
 
-// --- 3. AUTO-DETECT FUNCTION ---
-async function autoSelectModel() {
-    console.log("🔍 Scanning for active Groq models...");
+let ACTIVE_MODEL = MODEL_PRIORITY[0];
+let AVAILABLE_MODELS = [];
+
+// --- 3. AUTO-DETECT LOGIC ---
+async function autoSelectBestModel() {
+    console.log("🔍 Scanning Groq API for available models...");
     try {
         const response = await axios.get("https://api.groq.com/openai/v1/models", {
             headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` }
         });
-        const models = response.data.data;
-        // Re-check current IDs at https://console.groq.com/docs/deprecations periodically.
-        const priorities = [
-            "llama-3.3-70b-versatile",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "llama-3.1-8b-instant"
-        ];
-        const bestMatch = priorities.find(p => models.some(m => m.id === p));
-        if (bestMatch) { ACTIVE_MODEL = bestMatch; console.log(`✅ SELECTED BEST MODEL: ${ACTIVE_MODEL}`); }
+
+        AVAILABLE_MODELS = response.data.data.map(m => m.id);
+
+        const bestMatch = MODEL_PRIORITY.find(p => AVAILABLE_MODELS.includes(p));
+
+        if (bestMatch) {
+            ACTIVE_MODEL = bestMatch;
+            console.log(`✅ AUTO-SELECTED BEST MODEL: ${ACTIVE_MODEL}`);
+        } else {
+            console.warn("⚠️ None of the priority models were found in the account's model list. Keeping default:", ACTIVE_MODEL);
+        }
     } catch (error) {
-        console.error("❌ Model Scan Failed, using fallback:", ACTIVE_MODEL);
+        console.error("❌ Model scan failed. Check if your key is active:", error.message);
     }
 }
-autoSelectModel();
 
-// --- 4. MIDDLEWARE ---
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+// Run the scan on startup, then re-check periodically in case Groq
+// changes access tiers again while the server is running.
+autoSelectBestModel();
+setInterval(autoSelectBestModel, 6 * 60 * 60 * 1000); // every 6 hours
 
-const upload = multer({ storage: multer.memoryStorage() });
-
-// --- 5. AI ENGINE ---
-async function getDirectAI(prompt, history = []) {
+// --- 4. AI ENGINE ROUTE (with automatic fallback across the priority list) ---
+app.post('/api/ai', async (req, res) => {
+    const { prompt } = req.body;
     const url = "https://api.groq.com/openai/v1/chat/completions";
-    const messages = history.map(msg => ({
-        role: (msg.role === 'model' || msg.role === 'ai') ? 'assistant' : 'user',
-        content: msg.content
-    }));
-    messages.push({ role: "user", content: prompt });
-    try {
-        const response = await axios.post(url, {
-            model: ACTIVE_MODEL,
-            messages: messages,
-            temperature: 0.5
-        }, {
-            headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' }
-        });
-        return response.data.choices[0].message.content;
-    } catch (error) {
-        const groqMessage = error.response?.data?.error?.message || error.message;
-        console.error("AI processing error:", groqMessage);
-        return `AI Error: ${groqMessage}`;
+
+    // Try the currently active model first, then walk the rest of the
+    // priority list if it fails with a "model unavailable" style error.
+    const candidates = [ACTIVE_MODEL, ...MODEL_PRIORITY.filter(m => m !== ACTIVE_MODEL)];
+
+    let lastError = null;
+
+    for (const model of candidates) {
+        try {
+            const response = await axios.post(url, {
+                model,
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.7
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${GROQ_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            // This model worked — remember it so future requests skip straight to it.
+            if (ACTIVE_MODEL !== model) {
+                console.log(`↪️ Switched active model to ${model} after fallback`);
+                ACTIVE_MODEL = model;
+            }
+
+            return res.json({
+                reply: response.data.choices[0].message.content,
+                model_used: model
+            });
+
+        } catch (error) {
+            const status = error.response?.status;
+            const message = error.response?.data?.error?.message || error.message;
+            lastError = message;
+
+            // Only fall through to the next model on "model not found / no access"
+            // style errors (400/404). Other errors (bad prompt, rate limit, etc.)
+            // should surface immediately instead of masking the real problem.
+            const isModelAccessError = status === 404 || status === 400 || status === 403;
+            console.warn(`⚠️ Model "${model}" failed (${status}): ${message}`);
+
+            if (!isModelAccessError) break;
+        }
     }
-}
 
-// --- 6. ROUTES ---
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    console.error("AI processing error — all candidate models failed:", lastError);
+    res.status(500).json({ error: "Service unavailable. Check API key status and model access.", detail: lastError });
 });
 
-app.post('/api/interview', async (req, res) => {
-    const { message, history } = req.body;
-    const response = await getDirectAI(message, history);
-    res.json({ reply: response });
+app.listen(port, () => {
+    console.log(`🚀 Server running at http://localhost:${port}`);
 });
-
-app.post('/api/resume-scan', upload.single('resume'), async (req, res) => {
-    try {
-        if (!req.file) return res.status(400).json({ error: "No file" });
-        const pdfData = await pdfParse(req.file.buffer);
-        const text = pdfData.text;
-        if (!text || text.length < 50) return res.json({ score: 0, missing: ["Empty"], summary: "PDF has no text." });
-        const prompt = `Analyze resume text: "${text.substring(0, 3000)}...". Return ONLY valid JSON: { "score": 85, "missing": ["Skill1"], "summary": "Feedback" }`;
-        const rawResponse = await getDirectAI(prompt);
-        let cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-        const match = cleanJson.match(/\{[\s\S]*\}/);
-        if (match) cleanJson = match[0];
-        res.json(JSON.parse(cleanJson));
-    } catch (e) { res.json({ score: 0, missing: ["Error"], summary: "Could not analyze resume." }); }
-});
-
-app.post('/api/salary-negotiate', async (req, res) => {
-    const script = await getDirectAI(`Write a salary negotiation email for ${req.body.role}.`);
-    res.json({ script });
-});
-
-app.post('/api/find-jobs', async (req, res) => {
-    const data = await getDirectAI(`Generate 3 fake job listings for ${req.body.role}. JSON array: [{"title": "Job", "company": "Co", "location": "Loc", "salary": "$100k"}]`);
-    try {
-        let clean = data.replace(/```json/g, '').replace(/```/g, '').trim();
-        const match = clean.match(/\[[\s\S]*\]/);
-        if (match) clean = match[0];
-        res.json(JSON.parse(clean));
-    } catch (e) { res.json([]); }
-});
-
-app.listen(port, () => console.log(`✅ Server running at port ${port}`));
