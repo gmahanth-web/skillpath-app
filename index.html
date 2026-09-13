@@ -314,6 +314,21 @@
     .keyword-found { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
 
   </style>
+
+  <!-- Firebase Auth (replaces passport-google-oauth20) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDFT-VnhJKjr8O0p36UCSj-72dnfdvEVNM",
+      authDomain: "skillpath-80d5d.firebaseapp.com",
+      projectId: "skillpath-80d5d",
+      storageBucket: "skillpath-80d5d.firebasestorage.app",
+      messagingSenderId: "1052110298944",
+      appId: "1:1052110298944:web:ee50a8daae8461a35c64a5"
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
 </head>
 <body>
 
@@ -814,8 +829,22 @@
         }
     }
 
-    // FIXED: Render URL Redirect
-    function handleGoogleLogin() { window.location.href = "/auth/google"; }
+    // Firebase Google Sign-In (replaces /auth/google redirect)
+    function handleGoogleLogin() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        firebase.auth().signInWithPopup(provider)
+            .then((result) => {
+                const user = result.user;
+                userProfile.name = user.displayName || "User";
+                userProfile.email = user.email || "";
+                enterDashboard();
+            })
+            .catch((error) => {
+                const err = document.getElementById('loginError');
+                err.innerText = "Google sign-in failed: " + error.message;
+                err.style.display = 'block';
+            });
+    }
 
     function enterDashboard() { 
         document.getElementById('login-view').classList.add('hide'); 
@@ -824,7 +853,11 @@
         updateDashboard(); 
     }
     
-    function logout() { window.location.href = "/api/logout"; }
+    function logout() {
+        firebase.auth().signOut().finally(() => {
+            window.location.href = "/";
+        });
+    }
 
     /* --- PROFILE & DASHBOARD LOGIC --- */
     function loadProfile() {
@@ -1131,19 +1164,18 @@
         renderTrendList();
         const mHtml = MENTORS.map((m, index) => `<div class="card" style="padding:15px; display:flex; align-items:center; gap:10px;"><img src="${m.img}" style="width:40px;height:40px;border-radius:50%;"><div><div style="color:var(--text-main);font-weight:bold;">${m.name}</div><div style="font-size:12px;color:var(--text-muted);">${m.role}</div></div></div>`).join('');
         document.getElementById('homeMentorGrid').innerHTML = mHtml;
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('loggedin') === 'true') {
-            try {
-                const res = await fetch('/api/current_user');
-                const data = await res.json();
-                if (data.success) {
-                    userProfile.name = data.user.username; userProfile.email = data.user.email;
-                    document.getElementById('login-view').classList.add('hide');
-                    document.getElementById('app-view').classList.add('active-app');
-                    loadProfile(); updateDashboard();
-                }
-            } catch (e) { console.log("Login check failed"); }
-        }
+
+        // Restores the session if the user already signed in with Google previously
+        // (replaces the old ?loggedin=true + /api/current_user server-session check)
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                userProfile.name = user.displayName || "User";
+                userProfile.email = user.email || "";
+                document.getElementById('login-view').classList.add('hide');
+                document.getElementById('app-view').classList.add('active-app');
+                loadProfile(); updateDashboard();
+            }
+        });
     }
   </script>
 </body>
