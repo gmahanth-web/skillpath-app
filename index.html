@@ -224,6 +224,9 @@
           <div class="auth-toggle" style="margin-top:8px;">
               <a onclick="resendVerification()">Resend verification email</a>
           </div>
+          <div class="auth-toggle" style="margin-top:8px;">
+              <a onclick="forgotPassword()">Forgot Password?</a>
+          </div>
       </div>
   </div>
 
@@ -591,6 +594,7 @@
     let cameraStream = null;
     let currentUser = null;
     let userProfile = { name: "Guest", email: "", phone: "", location: "", title: "Learner", completedCourses: [], xp: 0, pfp: "" };
+    let trendCache = { at: 0, articles: [] };
 
     /* --- THEME --- */
     function setTheme(theme, el) {
@@ -623,33 +627,62 @@
         document.getElementById('loginError').style.display = 'none';
     }
 
+    function firebaseErrorMessage(err) {
+        const code = err?.code || '';
+        const raw = String(err?.message || 'Authentication failed.').replace('Firebase: ', '').trim();
+        const map = {
+            'auth/invalid-email': 'Please enter a valid email address.',
+            'auth/user-disabled': 'This account has been disabled. Please contact support.',
+            'auth/user-not-found': 'No account was found for this email address.',
+            'auth/wrong-password': 'Incorrect password. If you forgot it, use “Forgot Password?”.',
+            'auth/invalid-credential': 'Email or password is incorrect. If you forgot the password, use “Forgot Password?”.',
+            'auth/email-already-in-use': 'An account already exists with this email. Try logging in instead.',
+            'auth/weak-password': 'Password must be at least 6 characters.',
+            'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
+            'auth/network-request-failed': 'Network error. Check your internet connection and try again.',
+            'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
+            'auth/unauthorized-continue-uri': 'This app domain is not authorized in Firebase Authentication settings.'
+        };
+        return map[code] || raw;
+    }
+
     async function handleLoginClick() {
         const email = document.getElementById('loginUser').value.trim();
         const pass = document.getElementById('loginPass').value;
         clearAuthMessages();
         if (!email || !pass) return showAuthError("Please enter both email and password.");
 
+        const btn = document.getElementById('authSubmitBtn');
+        btn.disabled = true;
+
         try {
             if (isLoginMode) {
                 const cred = await auth.signInWithEmailAndPassword(email, pass);
+                await cred.user.reload();
                 if (!cred.user.emailVerified) {
                     await auth.signOut();
-                    showAuthError("Please verify your email first. Check your inbox, or resend the link below.");
+                    showAuthError("Please verify your email first. Check your inbox, or use 'Resend verification email'.");
                     return;
                 }
-                // onAuthStateChanged below handles entering the dashboard
+                // onAuthStateChanged below handles entering the dashboard.
             } else {
                 const cred = await auth.createUserWithEmailAndPassword(email, pass);
                 await cred.user.sendEmailVerification();
                 await auth.signOut();
-                showAuthInfo("Account created! We sent a verification link to " + email + ". Verify it, then log in.");
+
+                // Switch back to login mode without clearing the success message.
                 isLoginMode = true;
-                toggleAuthMode();
-                document.getElementById('loginInfo').style.display = 'block';
-                document.getElementById('loginInfo').innerText = "Verification email sent to " + email + ". Verify it, then log in here.";
+                document.getElementById('authTitle').innerText = 'Welcome back';
+                document.getElementById('authSubtitle').innerText = 'Verify your email, then sign in to access your dashboard.';
+                document.getElementById('toggleText').innerText = "Don't have an account?";
+                document.getElementById('authSubmitBtn').innerText = 'Log In';
+                document.getElementById('loginPass').value = '';
+                showAuthInfo("Verification email sent to " + email + ". Open the email, click the verification link, then log in here.");
             }
         } catch (err) {
-            showAuthError(err.message.replace('Firebase: ', ''));
+            showAuthError(firebaseErrorMessage(err));
+        } finally {
+            btn.disabled = false;
         }
     }
 
@@ -658,8 +691,10 @@
         const pass = document.getElementById('loginPass').value;
         clearAuthMessages();
         if (!email || !pass) return showAuthError("Enter your email and password, then tap resend.");
+
         try {
             const cred = await auth.signInWithEmailAndPassword(email, pass);
+            await cred.user.reload();
             if (cred.user.emailVerified) {
                 showAuthInfo("This email is already verified — just log in.");
                 await auth.signOut();
@@ -667,9 +702,26 @@
             }
             await cred.user.sendEmailVerification();
             await auth.signOut();
-            showAuthInfo("Verification email resent to " + email + ".");
+            showAuthInfo("Verification email resent to " + email + ". Check your inbox and spam folder.");
         } catch (err) {
-            showAuthError(err.message.replace('Firebase: ', ''));
+            showAuthError(firebaseErrorMessage(err));
+        }
+    }
+
+    async function forgotPassword() {
+        const email = document.getElementById('loginUser').value.trim();
+        clearAuthMessages();
+
+        if (!email) {
+            return showAuthError("Enter your email address first, then click 'Forgot Password?'.");
+        }
+
+        try {
+            // Firebase sends the actual reset email to the account's email address.
+            await auth.sendPasswordResetEmail(email);
+            showAuthInfo("Password reset link sent to " + email + ". Check your inbox and spam folder, then follow the link to create a new password.");
+        } catch (err) {
+            showAuthError(firebaseErrorMessage(err));
         }
     }
 
@@ -996,7 +1048,7 @@
         } catch (e) { box.innerHTML = "Server Error"; }
     }
 
-    /* --- AI PATH: searchable, detailed 30-day plan (fixed: now driven by the search bar) --- */
+    /* --- AI PATH: realistic 30-day plan --- */
     async function loadAIPath() {
         const interest = document.getElementById('pathInterestInput').value.trim();
         if (!interest) return alert("Type a skill or interest first, e.g. React Native or Data Analysis.");
@@ -1004,19 +1056,48 @@
         const container = document.getElementById('pathContent');
         loader.classList.remove('hide');
         container.innerHTML = '';
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
         try {
             const res = await fetch('/api/ai-path', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ interest, level: 'beginner' })
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({ interest, level: 'beginner', hoursPerDay: 1.5 })
             });
             const plan = await res.json();
-            if (!res.ok || !Array.isArray(plan.days) || !plan.days.length) throw new Error(plan.error || 'No roadmap returned');
-            let html = `<div class="card" style="border-left:4px solid var(--primary);"><h3 style="margin:0;">${escapeHtml(plan.title || interest)}</h3><p style="color:var(--text-muted);">${escapeHtml(plan.overview || '')}</p></div>`;
-            html += plan.days.slice(0, 30).map(d => `<div class="path-step-card"><div class="path-step-num">${escapeHtml(d.day)}</div><h3 style="margin:0 0 8px 0;">Day ${escapeHtml(d.day)}: ${escapeHtml(d.topic || d.title || '')}</h3><ul style="color:var(--text-muted); margin:8px 0; padding-left:20px;">${(Array.isArray(d.tasks) ? d.tasks : []).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>${d.resource ? `<a class="resource-btn" href="${safeUrl(d.resource)}" target="_blank" rel="noopener">📚 Open resource</a>` : ''}</div>`).join('');
+            if (!res.ok || !Array.isArray(plan.days) || plan.days.length < 30) {
+                throw new Error(plan.error || 'No complete 30-day roadmap returned');
+            }
+
+            let html = `<div class="card" style="border-left:4px solid var(--primary);">
+                <h3 style="margin:0 0 8px 0;">${escapeHtml(plan.title || interest)}</h3>
+                <p style="color:var(--text-muted);">${escapeHtml(plan.overview || '')}</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+                    <span class="tag">⏱ ${escapeHtml(plan.time_per_day || '1–2 hours/day')}</span>
+                    <span class="tag">📅 30 days</span>
+                    <span class="tag">🎯 Project-based</span>
+                </div>
+            </div>`;
+
+            html += plan.days.slice(0, 30).map(d => {
+                const tasks = Array.isArray(d.tasks) ? d.tasks : [];
+                return `<div class="path-step-card">
+                    <div class="path-step-num">${escapeHtml(d.day)}</div>
+                    <h3 style="margin:0 0 8px 0;">Day ${escapeHtml(d.day)}: ${escapeHtml(d.topic || d.title || '')}</h3>
+                    <div style="font-size:12px;color:var(--primary);font-weight:600;margin-bottom:8px;">${escapeHtml(d.time || '60–90 min')} • ${escapeHtml(d.type || 'Learn + Practice')}</div>
+                    <ul style="color:var(--text-muted);margin:8px 0;padding-left:20px;">${tasks.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+                    ${d.deliverable ? `<div style="margin-top:10px;padding:10px;border-radius:8px;background:rgba(16,185,129,.08);color:var(--success);font-size:13px;"><strong>Deliverable:</strong> ${escapeHtml(d.deliverable)}</div>` : ''}
+                    ${d.resource ? `<a class="resource-btn" href="${safeUrl(d.resource)}" target="_blank" rel="noopener">📚 Open resource</a>` : ''}
+                </div>`;
+            }).join('');
             container.innerHTML = html;
         } catch (e) {
-            container.innerHTML = `<div class="card" style="color:var(--error)">Could not generate a plan: ${escapeHtml(e.message)}</div>`;
+            const message = e.name === 'AbortError' ? 'The AI roadmap took too long. Please try again.' : e.message;
+            container.innerHTML = `<div class="card" style="color:var(--error)">Could not generate the roadmap: ${escapeHtml(message)}</div>`;
         } finally {
+            clearTimeout(timeout);
             loader.classList.add('hide');
         }
     }
@@ -1094,19 +1175,37 @@
     }
 
     /* --- LIVE TRENDS: real articles from /api/trending --- */
-    async function renderTrendList() {
+    async function fetchTrendingArticles(force = false) {
+        const now = Date.now();
+        if (!force && trendCache.articles.length && now - trendCache.at < 5 * 60 * 1000) {
+            return trendCache.articles;
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch('/api/trending');
+            const res = await fetch('/api/trending', { signal: controller.signal, cache: 'no-store' });
             const payload = await res.json();
             if (!res.ok) throw new Error(payload.error || 'Could not load trends');
             const articles = Array.isArray(payload) ? payload : (Array.isArray(payload.articles) ? payload.articles : []);
-            document.getElementById('trendList').innerHTML = articles.length
+            trendCache = { at: Date.now(), articles };
+            return articles;
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    async function renderTrendList(force = false) {
+        const trendList = document.getElementById('trendList');
+        try {
+            const articles = await fetchTrendingArticles(force);
+            trendList.innerHTML = articles.length
                 ? articles.slice(0, 5).map(t => `<a href="${safeUrl(t.url || t.link)}" target="_blank" rel="noopener" class="trend-link"><span class="trend-source">${escapeHtml(t.src || t.source || 'News')}</span>${escapeHtml(t.title)}</a>`).join('')
                 : `<p style="color:var(--text-muted);">No trends available right now.</p>`;
             const tickerHtml = articles.map(t => `<a href="${safeUrl(t.url || t.link)}" target="_blank" rel="noopener" class="ticker-item">📢 ${escapeHtml(t.title)}</a>`).join('');
             document.getElementById('liveTicker').innerHTML = tickerHtml ? tickerHtml + tickerHtml : '';
         } catch (e) {
-            document.getElementById('trendList').innerHTML = `<p style="color:var(--error);">Articles could not be loaded: ${escapeHtml(e.message)}</p>`;
+            trendList.innerHTML = `<p style="color:var(--error);">Articles could not be loaded: ${escapeHtml(e.name === 'AbortError' ? 'News feed timed out. Please refresh.' : e.message)}</p>`;
         }
     }
 
@@ -1146,10 +1245,14 @@
         const mod = currentCourse.modules[index];
         if (!mod) return;
         if (mod.content) { learnContent.innerHTML = mod.content; return; }
-        learnContent.innerHTML = `<div class="loader" style="margin-top:40px;"></div>`;
+        learnContent.innerHTML = `<div class="loader" style="margin-top:40px;"></div><p style="text-align:center;color:var(--text-muted);">Generating your lesson…</p>`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
         try {
             const res = await fetch('/api/course-content', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({ courseTitle: currentCourse.title, moduleTitle: mod.title })
             });
             const data = await res.json();
@@ -1158,7 +1261,9 @@
             learnContent.innerHTML = mod.content;
         } catch (e) {
             mod.content = localLesson(currentCourse.title, mod.title);
-            learnContent.innerHTML = mod.content;
+            learnContent.innerHTML = mod.content + `<p style="color:var(--text-muted);font-size:12px;margin-top:20px;">AI lesson generation was unavailable, so a built-in lesson was shown instead.</p>`;
+        } finally {
+            clearTimeout(timeout);
         }
     }
 
@@ -1192,7 +1297,7 @@
 
     /* --- BOOTSTRAP --- */
     window.onload = function () {
-        renderTrendList();
+        setTimeout(() => renderTrendList(false), 50);
         const mHtml = MENTORS.map((m, index) => `
             <div class="card" style="padding:15px; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="openMentorModal(${index})">
                 <img src="${m.img}" style="width:40px;height:40px;border-radius:50%;">
