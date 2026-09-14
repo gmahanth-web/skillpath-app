@@ -87,7 +87,7 @@
     .criteria-item:last-child { border-bottom: none; }
 
     .ticker-container { margin-bottom: 30px; border-radius: 12px; background: rgba(139, 92, 246, 0.05); border: 1px solid var(--card-border); overflow: hidden; padding: 10px; position: relative; z-index: 5; }
-    .ticker-wrapper { display: flex; width: fit-content; animation: scroll 40s linear infinite; }
+    .ticker-wrapper { display: flex; width: fit-content; animation: scroll 70s linear infinite; }
     .ticker-item { margin: 0 20px; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
     .ticker-item:hover { color: var(--primary); text-decoration: underline; }
     @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
@@ -222,10 +222,10 @@
               <span id="toggleText">Don't have an account?</span> <a onclick="toggleAuthMode()">Sign up</a>
           </div>
           <div class="auth-toggle" style="margin-top:8px;">
-              <a onclick="resendVerification()">Resend verification email</a>
+              <a id="resendVerifLink" onclick="resendVerification()">Resend verification email</a>
           </div>
           <div class="auth-toggle" style="margin-top:8px;">
-              <a onclick="forgotPassword()">Forgot Password?</a>
+              <a id="forgotPassLink" onclick="forgotPassword()">Forgot Password?</a>
           </div>
       </div>
   </div>
@@ -596,6 +596,36 @@
     let userProfile = { name: "Guest", email: "", phone: "", location: "", title: "Learner", completedCourses: [], xp: 0, pfp: "" };
     let trendCache = { at: 0, articles: [] };
 
+    /* --- COOLDOWN HELPERS (prevents Firebase's "too-many-requests" auth email throttling) --- */
+    const RESEND_COOLDOWN_SECONDS = 60;
+    const authCooldowns = {}; // linkId -> intervalId
+
+    function startAuthCooldown(linkId, label, seconds = RESEND_COOLDOWN_SECONDS) {
+        const el = document.getElementById(linkId);
+        if (!el) return;
+        if (authCooldowns[linkId]) clearInterval(authCooldowns[linkId]);
+        let remaining = seconds;
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.5';
+        el.innerText = `${label} (${remaining}s)`;
+        authCooldowns[linkId] = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(authCooldowns[linkId]);
+                delete authCooldowns[linkId];
+                el.style.pointerEvents = 'auto';
+                el.style.opacity = '1';
+                el.innerText = label;
+            } else {
+                el.innerText = `${label} (${remaining}s)`;
+            }
+        }, 1000);
+    }
+
+    function isOnCooldown(linkId) {
+        return Boolean(authCooldowns[linkId]);
+    }
+
     /* --- THEME --- */
     function setTheme(theme, el) {
         document.body.setAttribute('data-theme', theme);
@@ -638,7 +668,7 @@
             'auth/invalid-credential': 'Email or password is incorrect. If you forgot the password, use “Forgot Password?”.',
             'auth/email-already-in-use': 'An account already exists with this email. Try logging in instead.',
             'auth/weak-password': 'Password must be at least 6 characters.',
-            'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
+            'auth/too-many-requests': 'Firebase has temporarily rate-limited email sending on this project (this happens fast on the free plan when testing repeatedly). Please wait 15–30 minutes before trying again, and check your spam/junk folder for earlier emails.',
             'auth/network-request-failed': 'Network error. Check your internet connection and try again.',
             'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
             'auth/unauthorized-continue-uri': 'This app domain is not authorized in Firebase Authentication settings.'
@@ -661,11 +691,15 @@
                 await cred.user.reload();
                 if (!cred.user.emailVerified) {
                     await auth.signOut();
-                    showAuthError("Please verify your email first. Check your inbox, or use 'Resend verification email'.");
+                    showAuthError("Please verify your email first. Check your inbox (and spam folder), or use 'Resend verification email'.");
                     return;
                 }
                 // onAuthStateChanged below handles entering the dashboard.
             } else {
+                if (isOnCooldown('resendVerifLink')) {
+                    showAuthInfo("A verification email was just sent. Please check your inbox and spam folder before requesting another.");
+                    return;
+                }
                 const cred = await auth.createUserWithEmailAndPassword(email, pass);
                 await cred.user.sendEmailVerification();
                 await auth.signOut();
@@ -677,7 +711,8 @@
                 document.getElementById('toggleText').innerText = "Don't have an account?";
                 document.getElementById('authSubmitBtn').innerText = 'Log In';
                 document.getElementById('loginPass').value = '';
-                showAuthInfo("Verification email sent to " + email + ". Open the email, click the verification link, then log in here.");
+                showAuthInfo("Verification email sent to " + email + ". Check your inbox AND spam/junk/promotions folder — it can take a few minutes. Click the link, then log in here.");
+                startAuthCooldown('resendVerifLink', 'Resend verification email');
             }
         } catch (err) {
             showAuthError(firebaseErrorMessage(err));
@@ -687,6 +722,7 @@
     }
 
     async function resendVerification() {
+        if (isOnCooldown('resendVerifLink')) return;
         const email = document.getElementById('loginUser').value.trim();
         const pass = document.getElementById('loginPass').value;
         clearAuthMessages();
@@ -702,13 +738,15 @@
             }
             await cred.user.sendEmailVerification();
             await auth.signOut();
-            showAuthInfo("Verification email resent to " + email + ". Check your inbox and spam folder.");
+            showAuthInfo("Verification email resent to " + email + ". Check your inbox AND spam/junk folder — delivery can take a few minutes.");
+            startAuthCooldown('resendVerifLink', 'Resend verification email');
         } catch (err) {
             showAuthError(firebaseErrorMessage(err));
         }
     }
 
     async function forgotPassword() {
+        if (isOnCooldown('forgotPassLink')) return;
         const email = document.getElementById('loginUser').value.trim();
         clearAuthMessages();
 
@@ -719,7 +757,8 @@
         try {
             // Firebase sends the actual reset email to the account's email address.
             await auth.sendPasswordResetEmail(email);
-            showAuthInfo("Password reset link sent to " + email + ". Check your inbox and spam folder, then follow the link to create a new password.");
+            showAuthInfo("Password reset link sent to " + email + ". Check your inbox AND spam/junk folder — it can take a few minutes to arrive. Then follow the link to create a new password.");
+            startAuthCooldown('forgotPassLink', 'Forgot Password?');
         } catch (err) {
             showAuthError(firebaseErrorMessage(err));
         }
@@ -1195,6 +1234,22 @@
         }
     }
 
+    /* Keep the ticker at a constant reading speed (px/sec) no matter how much
+       headline text is loaded — this is what was causing it to fly by too fast. */
+    function adjustTickerSpeed() {
+        const wrapper = document.getElementById('liveTicker');
+        if (!wrapper) return;
+        const PIXELS_PER_SECOND = 55;
+        const MIN_DURATION = 20;
+        // wrapper contains the ticker content duplicated once (for the seamless loop),
+        // so one full loop only needs to cover half of the wrapper's rendered width.
+        const singleLoopWidth = wrapper.scrollWidth / 2;
+        const duration = singleLoopWidth > 0
+            ? Math.max(singleLoopWidth / PIXELS_PER_SECOND, MIN_DURATION)
+            : MIN_DURATION;
+        wrapper.style.animationDuration = duration + 's';
+    }
+
     async function renderTrendList(force = false) {
         const trendList = document.getElementById('trendList');
         try {
@@ -1204,6 +1259,8 @@
                 : `<p style="color:var(--text-muted);">No trends available right now.</p>`;
             const tickerHtml = articles.map(t => `<a href="${safeUrl(t.url || t.link)}" target="_blank" rel="noopener" class="ticker-item">📢 ${escapeHtml(t.title)}</a>`).join('');
             document.getElementById('liveTicker').innerHTML = tickerHtml ? tickerHtml + tickerHtml : '';
+            // Recalculate after the browser has laid out the new (possibly longer) content.
+            requestAnimationFrame(adjustTickerSpeed);
         } catch (e) {
             trendList.innerHTML = `<p style="color:var(--error);">Articles could not be loaded: ${escapeHtml(e.name === 'AbortError' ? 'News feed timed out. Please refresh.' : e.message)}</p>`;
         }
@@ -1298,6 +1355,7 @@
     /* --- BOOTSTRAP --- */
     window.onload = function () {
         setTimeout(() => renderTrendList(false), 50);
+        window.addEventListener('resize', () => adjustTickerSpeed());
         const mHtml = MENTORS.map((m, index) => `
             <div class="card" style="padding:15px; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="openMentorModal(${index})">
                 <img src="${m.img}" style="width:40px;height:40px;border-radius:50%;">
