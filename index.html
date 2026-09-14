@@ -237,7 +237,7 @@
         <a onclick="nav('skills')" id="btn-skills" class="nav-link">💼 Skill Matcher</a>
 
         <a onclick="nav('interview')" id="btn-interview" class="nav-link">🎤 AI Interview (Real)</a>
-        <a onclick="nav('resume')" id="btn-resume" class="nav-link">📄 ATS Checker (Text)</a>
+        <a onclick="nav('resume')" id="btn-resume" class="nav-link">📄 ATS Resume Checker</a>
         <a onclick="nav('salary')" id="btn-salary" class="nav-link">💰 Salary AI</a>
 
         <a onclick="nav('profile')" id="btn-profile" class="nav-link">👤 Profile</a>
@@ -389,6 +389,19 @@
           <div class="card" style="max-width: 900px; margin: 0 auto;">
               <h2 style="color:var(--text-main);">ATS Resume Checker</h2>
               <p style="color:var(--text-muted); margin-bottom:20px;">Paste your resume text and the job description to check your ATS score and get instant improvements.</p>
+              <div class="card" style="background:rgba(139,92,246,0.06); border:1px dashed var(--primary); margin-bottom:20px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:15px; flex-wrap:wrap;">
+                      <div>
+                          <strong style="color:var(--text-main);">📄 Upload Resume PDF</strong>
+                          <div id="resumeFileName" style="font-size:12px; color:var(--text-muted); margin-top:5px;">PDF only • max 5 MB</div>
+                      </div>
+                      <label for="resumePdf" class="btn btn-primary" style="cursor:pointer;">Choose PDF</label>
+                      <input id="resumePdf" type="file" accept="application/pdf,.pdf" style="display:none;" onchange="uploadResumePDF(this)">
+                  </div>
+                  <div id="resumeUploadLoader" class="loader hide" style="margin-top:15px;"></div>
+                  <div id="resumeUploadStatus" style="font-size:13px; margin-top:10px;"></div>
+              </div>
+              <div class="grid-2">
               <div class="grid-2">
                   <div>
                       <label style="font-size:13px; color:var(--primary); font-weight:bold;">1. PASTE RESUME TEXT</label>
@@ -883,6 +896,27 @@
         }
     }
 
+    function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
+    function safeUrl(v){try{const u=new URL(v,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:'#';}catch(_){return '#';}}
+
+    async function uploadResumePDF(input){
+        const file=input.files?.[0]; if(!file) return;
+        if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){input.value='';return alert('Please select a PDF file.');}
+        if(file.size>5*1024*1024){input.value='';return alert('PDF must be 5 MB or smaller.');}
+        const loader=document.getElementById('resumeUploadLoader'), status=document.getElementById('resumeUploadStatus');
+        document.getElementById('resumeFileName').innerText=file.name;
+        loader.classList.remove('hide'); status.innerText='Reading PDF…'; status.style.color='var(--text-muted)';
+        try{
+            const fd=new FormData(); fd.append('resume',file);
+            const res=await fetch('/api/resume-upload',{method:'POST',body:fd}), data=await res.json();
+            if(!res.ok) throw new Error(data.error||'PDF could not be read');
+            document.getElementById('resumeText').value=data.text||'';
+            status.innerText=`✅ PDF read successfully — ${data.pages||1} page(s), ${data.textLength||0} characters extracted.`;
+            status.style.color='var(--success)';
+        }catch(e){status.innerText='❌ '+e.message;status.style.color='var(--error)';}
+        finally{loader.classList.add('hide');}
+    }
+
     /* --- ATS RESUME SCANNER --- */
     async function scanResume() {
         const resumeText = document.getElementById('resumeText').value;
@@ -912,7 +946,7 @@
             document.getElementById('resumeFeedback').innerText = result.feedback;
         } catch (e) {
             loader.classList.add('hide');
-            alert("Error scanning resume.");
+            alert("Error scanning resume: " + (e.message || "Please try again."));
         }
     }
 
@@ -934,75 +968,53 @@
         } catch (e) { box.innerHTML = "Server Error"; }
     }
 
-    /* --- AI PATH: searchable, detailed 30-day plan (fixed: now driven by the search bar) --- */
+    /* --- AI PATH: detailed 30-day plan --- */
     async function loadAIPath() {
         const interest = document.getElementById('pathInterestInput').value.trim();
-        if (!interest) return alert("Type a skill or interest first, e.g. 'React Native' or 'Data Analysis'.");
+        if (!interest) return alert("Type a skill or interest first.");
         const loader = document.getElementById('pathLoader');
         const container = document.getElementById('pathContent');
-        loader.classList.remove('hide');
-        container.innerHTML = '';
+        loader.classList.remove('hide'); container.innerHTML = '';
         try {
             const res = await fetch('/api/ai-path', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ interest, level: "beginner" })
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({interest, level:'beginner'})
             });
             const plan = await res.json();
-            loader.classList.add('hide');
-            if (!plan.days) { container.innerHTML = `<div class="card" style="color:var(--error)">Could not generate a plan. Try again.</div>`; return; }
-            let html = `<div class="card" style="border-left:4px solid var(--primary);"><h3 style="margin:0;">${plan.title || interest}</h3><p style="color:var(--text-muted);">${plan.overview || ''}</p></div>`;
-            html += plan.days.map(d => `
-                <div class="path-step-card">
-                    <div class="path-step-num">${d.day}</div>
-                    <h3 style="margin:0 0 8px 0;">Day ${d.day}: ${d.topic}</h3>
-                    <ul style="color:var(--text-muted); margin:8px 0; padding-left:20px;">${(d.tasks || []).map(t => `<li>${t}</li>`).join('')}</ul>
-                    ${d.resource ? `<span class="resource-btn">📚 ${d.resource}</span>` : ''}
-                </div>`).join('');
-            container.innerHTML = html;
-        } catch (e) {
-            loader.classList.add('hide');
-            container.innerHTML = `<div class="card" style="color:var(--error)">Could not generate a plan. Try again.</div>`;
-        }
+            if (!res.ok || !Array.isArray(plan.days)) throw new Error(plan.error || 'No roadmap returned');
+            let out = `<div class="card" style="border-left:4px solid var(--primary);"><h3>${escapeHtml(plan.title || interest)}</h3><p style="color:var(--text-muted);">${escapeHtml(plan.overview || '')}</p><small style="color:var(--success);">AI-generated 30-day roadmap</small></div>`;
+            out += plan.days.map(d => `<div class="path-step-card"><div class="path-step-num">${d.day}</div><h3>Day ${d.day}: ${escapeHtml(d.topic || '')}</h3><ul style="color:var(--text-muted);">${(d.tasks||[]).map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ul>${d.resource ? `<a class="resource-btn" href="${safeUrl(d.resource)}" target="_blank" rel="noopener">📚 Open resource</a>`:''}</div>`).join('');
+            container.innerHTML=out;
+        } catch(e) {
+            container.innerHTML=`<div class="card" style="color:var(--error)">Could not generate the AI path: ${escapeHtml(e.message)}</div>`;
+        } finally { loader.classList.add('hide'); }
     }
 
-    /* --- SKILL MATCHER: real jobs from /api/jobs --- */
+    /* --- SKILL MATCHER + LIVE JOBS: real listings --- */
     async function searchJobsBySkills() {
-        const skills = document.getElementById('skillSearchInput').value;
-        const loader = document.getElementById('skillJobLoader');
-        const container = document.getElementById('skillJobResults');
-        if (!skills) return alert("Please enter some skills.");
-        loader.classList.remove('hide');
-        container.innerHTML = '';
+        const skills=document.getElementById('skillSearchInput').value.trim(), loader=document.getElementById('skillJobLoader'), box=document.getElementById('skillJobResults');
+        if(!skills) return alert('Please enter some skills.');
+        loader.classList.remove('hide'); box.innerHTML='';
         try {
-            const res = await fetch(`/api/jobs?q=${encodeURIComponent(skills)}`);
-            const jobs = await res.json();
-            loader.classList.add('hide');
-            container.innerHTML = jobs.length ? jobs.map(job => `
-                <a href="${job.url}" target="_blank" class="job-card">
-                    <h3 style="margin:0;">${job.title}</h3>
-                    <div style="color:var(--primary); font-weight:bold;">${job.company}</div>
-                    <div style="color:var(--text-muted); font-size:13px;">📍 ${job.location} • 💰 ${job.salary}</div>
-                </a>`).join('') : `<p style="color:var(--text-muted);">No live openings matched those skills right now — try broader terms.</p>`;
-        } catch (e) { loader.classList.add('hide'); }
+            const res=await fetch(`/api/jobs?q=${encodeURIComponent(skills)}`), payload=await res.json();
+            if(!res.ok) throw new Error(payload.error||'Job search failed');
+            box.innerHTML=(payload.jobs||[]).map(renderJobCard).join('') || `<p style="color:var(--text-muted);">No live openings found. Try broader skills.</p>`;
+        } catch(e){ box.innerHTML=`<p style="color:var(--error);">Job search failed: ${escapeHtml(e.message)}</p>`; }
+        finally{ loader.classList.add('hide'); }
     }
-
-    /* --- LIVE JOBS: searchable, real, clickable to the real listing --- */
     async function loadAIJobs() {
-        const loader = document.getElementById('jobsLoader');
-        const container = document.getElementById('jobsContent');
-        const query = document.getElementById('jobsSearchInput').value.trim() || userProfile.title || "software";
-        loader.classList.remove('hide');
+        const loader=document.getElementById('jobsLoader'), box=document.getElementById('jobsContent');
+        const q=document.getElementById('jobsSearchInput').value.trim() || userProfile.title || 'software developer';
+        loader.classList.remove('hide'); box.innerHTML='';
         try {
-            const res = await fetch(`/api/jobs?q=${encodeURIComponent(query)}`);
-            const data = await res.json();
-            loader.classList.add('hide');
-            container.innerHTML = data.length ? data.map(job => `
-                <a href="${job.url}" target="_blank" class="job-card">
-                    <h4 style="margin:0;">${job.title}</h4>
-                    <div style="color:var(--primary); font-weight:bold;">${job.company}</div>
-                    <div style="color:var(--text-muted); font-size:12px;">📍 ${job.location} • 💰 ${job.salary}</div>
-                </a>`).join('') : `<p style="color:var(--text-muted);">No live openings found for "${query}" — try a different search.</p>`;
-        } catch (e) { loader.classList.add('hide'); }
+            const res=await fetch(`/api/jobs?q=${encodeURIComponent(q)}`), payload=await res.json();
+            if(!res.ok) throw new Error(payload.error||'Job search failed');
+            box.innerHTML=(payload.jobs||[]).map(renderJobCard).join('') || `<p style="color:var(--text-muted);">No live openings found for "${escapeHtml(q)}".</p>`;
+        } catch(e){ box.innerHTML=`<p style="color:var(--error);">Live jobs could not be loaded: ${escapeHtml(e.message)}</p>`; }
+        finally{ loader.classList.add('hide'); }
+    }
+    function renderJobCard(job){
+        return `<a href="${safeUrl(job.url)}" target="_blank" rel="noopener" class="job-card"><h3 style="margin:0 0 6px">${escapeHtml(job.title)}</h3><div style="color:var(--primary);font-weight:bold">${escapeHtml(job.company)}</div><div style="color:var(--text-muted);font-size:13px;margin-top:6px">📍 ${escapeHtml(job.location||'Remote')} • ${escapeHtml(job.salary||'Salary not listed')}</div><div style="font-size:11px;color:var(--success);margin-top:8px">${escapeHtml(job.source||'Job board')} • Open listing ↗</div></a>`;
     }
 
     /* --- MENTORS (fixed: cards are now clickable, modal has real open/close/booking logic) --- */
@@ -1032,19 +1044,17 @@
         document.getElementById('bookingContainer').innerHTML += `<div class="success-msg">✅ Booked for ${slot}!</div>`;
     }
 
-    /* --- LIVE TRENDS: real articles from /api/trending --- */
+    /* --- LIVE TRENDS / ARTICLES --- */
     async function renderTrendList() {
         try {
-            const res = await fetch('/api/trending');
-            const articles = await res.json();
-            document.getElementById('trendList').innerHTML = articles.length
-                ? articles.slice(0, 3).map(t => `<a href="${t.url}" target="_blank" class="trend-link"><span class="trend-source">${t.src}</span>${t.title}</a>`).join('')
-                : `<p style="color:var(--text-muted);">No trends available right now.</p>`;
-            const tickerHtml = articles.map(t => `<a href="${t.url}" target="_blank" class="ticker-item">📢 ${t.title}</a>`).join('');
-            document.getElementById('liveTicker').innerHTML = tickerHtml + tickerHtml;
-        } catch (e) {
-            document.getElementById('trendList').innerHTML = `<p style="color:var(--text-muted);">Could not load trends.</p>`;
-        }
+            const res=await fetch('/api/trending'), articles=await res.json();
+            if(!res.ok) throw new Error(articles.error||'Could not load articles');
+            document.getElementById('trendList').innerHTML=articles.length
+              ? articles.slice(0,5).map(t=>`<a href="${safeUrl(t.url)}" target="_blank" rel="noopener" class="trend-link"><span class="trend-source">${escapeHtml(t.src||'News')}</span>${escapeHtml(t.title)}</a>`).join('')
+              : `<p style="color:var(--text-muted)">No articles available right now.</p>`;
+            const ticker=articles.map(t=>`<a href="${safeUrl(t.url)}" target="_blank" rel="noopener" class="ticker-item">📢 ${escapeHtml(t.title)}</a>`).join('');
+            document.getElementById('liveTicker').innerHTML=ticker+ticker;
+        } catch(e){ document.getElementById('trendList').innerHTML=`<p style="color:var(--error)">Articles could not be loaded: ${escapeHtml(e.message)}</p>`; }
     }
 
     async function loadTrending() {
