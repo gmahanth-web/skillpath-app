@@ -73,6 +73,7 @@
     .info-msg { color: var(--success); font-size: 13px; margin-bottom: 15px; display: none; background: rgba(16,185,129,0.1); padding: 8px; border-radius: 6px; }
 
     .hide { display: none !important; }
+    .view-section:not(.hide) { display: block; }
     .fade-in { animation: fadeIn 0.5s ease forwards; opacity: 0; transform: translateY(10px); }
     @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
 
@@ -237,7 +238,7 @@
         <a onclick="nav('skills')" id="btn-skills" class="nav-link">💼 Skill Matcher</a>
 
         <a onclick="nav('interview')" id="btn-interview" class="nav-link">🎤 AI Interview (Real)</a>
-        <a onclick="nav('resume')" id="btn-resume" class="nav-link">📄 ATS Resume Checker</a>
+        <a onclick="nav('resume')" id="btn-resume" class="nav-link">📄 ATS Checker (Text)</a>
         <a onclick="nav('salary')" id="btn-salary" class="nav-link">💰 Salary AI</a>
 
         <a onclick="nav('profile')" id="btn-profile" class="nav-link">👤 Profile</a>
@@ -389,27 +390,18 @@
           <div class="card" style="max-width: 900px; margin: 0 auto;">
               <h2 style="color:var(--text-main);">ATS Resume Checker</h2>
               <p style="color:var(--text-muted); margin-bottom:20px;">Paste your resume text and the job description to check your ATS score and get instant improvements.</p>
-              <div class="card" style="background:rgba(139,92,246,0.06); border:1px dashed var(--primary); margin-bottom:20px;">
-                  <div style="display:flex; align-items:center; justify-content:space-between; gap:15px; flex-wrap:wrap;">
-                      <div>
-                          <strong style="color:var(--text-main);">📄 Upload Resume PDF</strong>
-                          <div id="resumeFileName" style="font-size:12px; color:var(--text-muted); margin-top:5px;">PDF only • max 5 MB</div>
-                      </div>
-                      <label for="resumePdf" class="btn btn-primary" style="cursor:pointer;">Choose PDF</label>
-                      <input id="resumePdf" type="file" accept="application/pdf,.pdf" style="display:none;" onchange="uploadResumePDF(this)">
-                  </div>
-                  <div id="resumeUploadLoader" class="loader hide" style="margin-top:15px;"></div>
-                  <div id="resumeUploadStatus" style="font-size:13px; margin-top:10px;"></div>
-              </div>
-              <div class="grid-2">
               <div class="grid-2">
                   <div>
-                      <label style="font-size:13px; color:var(--primary); font-weight:bold;">1. PASTE RESUME TEXT</label>
-                      <textarea id="resumeText" class="input-field" placeholder="Copy and paste your full resume content here..."></textarea>
+                      <label style="font-size:13px; color:var(--primary); font-weight:bold;">1. UPLOAD OR PASTE RESUME</label>
+                      <div style="border:1px dashed var(--card-border); border-radius:12px; padding:14px; margin-bottom:12px; background:rgba(255,255,255,0.03);">
+                          <input type="file" id="resumePdfInput" accept="application/pdf,.pdf" onchange="uploadResumePDF(this)" style="width:100%; color:var(--text-muted);">
+                          <div id="resumeUploadStatus" style="font-size:12px; color:var(--text-muted); margin-top:8px;">PDF up to 5 MB. Text-based PDFs are supported.</div>
+                      </div>
+                      <textarea id="resumeText" class="input-field" placeholder="Upload a PDF or copy and paste your full resume content here..."></textarea>
                   </div>
                   <div>
                       <label style="font-size:13px; color:var(--primary); font-weight:bold;">2. PASTE JOB DESCRIPTION</label>
-                      <textarea id="jobDesc" class="input-field" placeholder="Copy the job description you are applying for..."></textarea>
+                      <textarea id="jobDesc" class="input-field" placeholder="Copy and paste the job description you are applying for..."></textarea>
                   </div>
               </div>
               <button onclick="scanResume()" class="btn btn-primary" style="width:100%; margin-top:20px;">Check ATS Score</button>
@@ -794,10 +786,18 @@
     }
 
     function nav(pageId) {
-        document.querySelectorAll('.view-section').forEach(el => { el.classList.add('hide'); el.classList.remove('fade-in'); });
+        document.querySelectorAll('.view-section').forEach(el => {
+            el.classList.add('hide');
+            el.classList.remove('fade-in');
+            el.style.display = '';
+        });
         document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
         const target = document.getElementById('view-' + pageId);
-        if (target) { target.classList.remove('hide'); void target.offsetWidth; target.classList.add('fade-in'); }
+        if (!target) { console.warn('Page not found:', pageId); return; }
+        target.classList.remove('hide');
+        target.style.display = 'block';
+        void target.offsetWidth;
+        target.classList.add('fade-in');
         const btn = document.getElementById('btn-' + pageId);
         if (btn) btn.classList.add('active');
         if (pageId === 'jobs') loadAIJobs();
@@ -896,25 +896,51 @@
         }
     }
 
-    function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
-    function safeUrl(v){try{const u=new URL(v,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:'#';}catch(_){return '#';}}
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;',"\"":'&quot;'}[ch]));
+    }
 
-    async function uploadResumePDF(input){
-        const file=input.files?.[0]; if(!file) return;
-        if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){input.value='';return alert('Please select a PDF file.');}
-        if(file.size>5*1024*1024){input.value='';return alert('PDF must be 5 MB or smaller.');}
-        const loader=document.getElementById('resumeUploadLoader'), status=document.getElementById('resumeUploadStatus');
-        document.getElementById('resumeFileName').innerText=file.name;
-        loader.classList.remove('hide'); status.innerText='Reading PDF…'; status.style.color='var(--text-muted)';
-        try{
-            const fd=new FormData(); fd.append('resume',file);
-            const res=await fetch('/api/resume-upload',{method:'POST',body:fd}), data=await res.json();
-            if(!res.ok) throw new Error(data.error||'PDF could not be read');
-            document.getElementById('resumeText').value=data.text||'';
-            status.innerText=`✅ PDF read successfully — ${data.pages||1} page(s), ${data.textLength||0} characters extracted.`;
-            status.style.color='var(--success)';
-        }catch(e){status.innerText='❌ '+e.message;status.style.color='var(--error)';}
-        finally{loader.classList.add('hide');}
+    function safeUrl(value) {
+        try {
+            const u = new URL(String(value || ''), window.location.origin);
+            if (u.protocol === 'http:' || u.protocol === 'https:') return u.href;
+        } catch (_) {}
+        return '#';
+    }
+
+    /* --- ATS RESUME PDF UPLOAD --- */
+    async function uploadResumePDF(input) {
+        const file = input && input.files ? input.files[0] : null;
+        const status = document.getElementById('resumeUploadStatus');
+        const textBox = document.getElementById('resumeText');
+        if (!file) return;
+        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+            status.innerText = 'Please select a PDF file.';
+            status.style.color = 'var(--error)';
+            input.value = '';
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            status.innerText = 'PDF is too large. Maximum size is 5 MB.';
+            status.style.color = 'var(--error)';
+            input.value = '';
+            return;
+        }
+        status.innerText = 'Reading PDF...';
+        status.style.color = 'var(--primary)';
+        try {
+            const form = new FormData();
+            form.append('resume', file);
+            const res = await fetch('/api/resume-upload', { method: 'POST', body: form });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Could not read PDF');
+            textBox.value = data.text || '';
+            status.innerText = `✅ ${file.name} read successfully • ${data.pages || 1} page(s) • ${data.textLength || 0} characters extracted.`;
+            status.style.color = 'var(--success)';
+        } catch (e) {
+            status.innerText = 'Could not read PDF: ' + e.message;
+            status.style.color = 'var(--error)';
+        }
     }
 
     /* --- ATS RESUME SCANNER --- */
@@ -923,7 +949,7 @@
         const jobDesc = document.getElementById('jobDesc').value;
         const resBox = document.getElementById('resumeResult');
         const loader = document.getElementById('resumeLoader');
-        if (resumeText.length < 50) return alert("Please paste your resume text first.");
+        if (resumeText.length < 50) return alert("Please upload or paste your resume text first.");
         loader.classList.remove('hide');
         resBox.classList.add('hide');
         try {
@@ -933,20 +959,22 @@
                 body: JSON.stringify({ role: "ATS Scanner", message: prompt, history: [] })
             });
             const data = await res.json();
-            let cleanJson = data.reply.replace(/```json/g, '').replace(/```/g, '').trim();
+            if (!res.ok) throw new Error(data.error || data.detail || 'AI service failed');
+            if (!data.reply) throw new Error('AI service returned no reply. Check your Groq API key and Render logs.');
+            let cleanJson = String(data.reply).replace(/```json/gi, '').replace(/```/g, '').trim();
             const match = cleanJson.match(/\{[\s\S]*\}/);
             if (match) cleanJson = match[0];
             const result = JSON.parse(cleanJson);
             loader.classList.add('hide');
             resBox.classList.remove('hide');
-            document.getElementById('atsScoreDisplay').innerText = result.score + "/100";
-            document.getElementById('atsScoreFill').style.width = result.score + "%";
-            const missingHtml = (result.missing_keywords || []).map(k => `<span class="keyword-badge keyword-missing">${k}</span>`).join('');
+            document.getElementById('atsScoreDisplay').innerText = (Number(result.score) || 0) + "/100";
+            document.getElementById('atsScoreFill').style.width = Math.max(0, Math.min(100, Number(result.score) || 0)) + "%";
+            const missingHtml = (Array.isArray(result.missing_keywords) ? result.missing_keywords : []).map(k => `<span class="keyword-badge keyword-missing">${escapeHtml(k)}</span>`).join('');
             document.getElementById('missingKeywords').innerHTML = missingHtml || "None! Great job.";
-            document.getElementById('resumeFeedback').innerText = result.feedback;
+            document.getElementById('resumeFeedback').innerText = result.feedback || 'No additional feedback returned.';
         } catch (e) {
             loader.classList.add('hide');
-            alert("Error scanning resume: " + (e.message || "Please try again."));
+            alert("Error scanning resume: " + e.message);
         }
     }
 
@@ -968,53 +996,74 @@
         } catch (e) { box.innerHTML = "Server Error"; }
     }
 
-    /* --- AI PATH: detailed 30-day plan --- */
+    /* --- AI PATH: searchable, detailed 30-day plan (fixed: now driven by the search bar) --- */
     async function loadAIPath() {
         const interest = document.getElementById('pathInterestInput').value.trim();
-        if (!interest) return alert("Type a skill or interest first.");
+        if (!interest) return alert("Type a skill or interest first, e.g. React Native or Data Analysis.");
         const loader = document.getElementById('pathLoader');
         const container = document.getElementById('pathContent');
-        loader.classList.remove('hide'); container.innerHTML = '';
+        loader.classList.remove('hide');
+        container.innerHTML = '';
         try {
             const res = await fetch('/api/ai-path', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({interest, level:'beginner'})
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interest, level: 'beginner' })
             });
             const plan = await res.json();
-            if (!res.ok || !Array.isArray(plan.days)) throw new Error(plan.error || 'No roadmap returned');
-            let out = `<div class="card" style="border-left:4px solid var(--primary);"><h3>${escapeHtml(plan.title || interest)}</h3><p style="color:var(--text-muted);">${escapeHtml(plan.overview || '')}</p><small style="color:var(--success);">AI-generated 30-day roadmap</small></div>`;
-            out += plan.days.map(d => `<div class="path-step-card"><div class="path-step-num">${d.day}</div><h3>Day ${d.day}: ${escapeHtml(d.topic || '')}</h3><ul style="color:var(--text-muted);">${(d.tasks||[]).map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ul>${d.resource ? `<a class="resource-btn" href="${safeUrl(d.resource)}" target="_blank" rel="noopener">📚 Open resource</a>`:''}</div>`).join('');
-            container.innerHTML=out;
-        } catch(e) {
-            container.innerHTML=`<div class="card" style="color:var(--error)">Could not generate the AI path: ${escapeHtml(e.message)}</div>`;
+            if (!res.ok || !Array.isArray(plan.days) || !plan.days.length) throw new Error(plan.error || 'No roadmap returned');
+            let html = `<div class="card" style="border-left:4px solid var(--primary);"><h3 style="margin:0;">${escapeHtml(plan.title || interest)}</h3><p style="color:var(--text-muted);">${escapeHtml(plan.overview || '')}</p></div>`;
+            html += plan.days.slice(0, 30).map(d => `<div class="path-step-card"><div class="path-step-num">${escapeHtml(d.day)}</div><h3 style="margin:0 0 8px 0;">Day ${escapeHtml(d.day)}: ${escapeHtml(d.topic || d.title || '')}</h3><ul style="color:var(--text-muted); margin:8px 0; padding-left:20px;">${(Array.isArray(d.tasks) ? d.tasks : []).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>${d.resource ? `<a class="resource-btn" href="${safeUrl(d.resource)}" target="_blank" rel="noopener">📚 Open resource</a>` : ''}</div>`).join('');
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = `<div class="card" style="color:var(--error)">Could not generate a plan: ${escapeHtml(e.message)}</div>`;
+        } finally {
+            loader.classList.add('hide');
+        }
+    }
+
+    /* --- SKILL MATCHER: real jobs from /api/jobs --- */
+    function normalizeJobsPayload(payload) {
+        return Array.isArray(payload) ? payload : (Array.isArray(payload.jobs) ? payload.jobs : []);
+    }
+
+    function renderJobCard(job) {
+        return `<a href="${safeUrl(job.url)}" target="_blank" rel="noopener" class="job-card"><h3 style="margin:0 0 6px;">${escapeHtml(job.title || 'Job opening')}</h3><div style="color:var(--primary);font-weight:bold;">${escapeHtml(job.company || 'Company')}</div><div style="color:var(--text-muted);font-size:13px;margin-top:6px;">📍 ${escapeHtml(job.location || 'Remote')} • 💰 ${escapeHtml(job.salary || 'Salary not listed')}</div><div style="font-size:11px;color:var(--success);margin-top:8px;">${escapeHtml(job.source || 'Job board')} • Open listing ↗</div></a>`;
+    }
+
+    async function searchJobsBySkills() {
+        const skills = document.getElementById('skillSearchInput').value.trim();
+        const loader = document.getElementById('skillJobLoader');
+        const container = document.getElementById('skillJobResults');
+        if (!skills) return alert("Please enter some skills.");
+        loader.classList.remove('hide');
+        container.innerHTML = '';
+        try {
+            const res = await fetch(`/api/jobs?q=${encodeURIComponent(skills)}`);
+            const payload = await res.json();
+            if (!res.ok) throw new Error(payload.error || 'Job search failed');
+            const jobs = normalizeJobsPayload(payload);
+            container.innerHTML = jobs.length ? jobs.map(renderJobCard).join('') : `<p style="color:var(--text-muted);">No live openings matched those skills right now — try broader terms.</p>`;
+        } catch (e) {
+            container.innerHTML = `<p style="color:var(--error);">Job search failed: ${escapeHtml(e.message)}</p>`;
         } finally { loader.classList.add('hide'); }
     }
 
-    /* --- SKILL MATCHER + LIVE JOBS: real listings --- */
-    async function searchJobsBySkills() {
-        const skills=document.getElementById('skillSearchInput').value.trim(), loader=document.getElementById('skillJobLoader'), box=document.getElementById('skillJobResults');
-        if(!skills) return alert('Please enter some skills.');
-        loader.classList.remove('hide'); box.innerHTML='';
-        try {
-            const res=await fetch(`/api/jobs?q=${encodeURIComponent(skills)}`), payload=await res.json();
-            if(!res.ok) throw new Error(payload.error||'Job search failed');
-            box.innerHTML=(payload.jobs||[]).map(renderJobCard).join('') || `<p style="color:var(--text-muted);">No live openings found. Try broader skills.</p>`;
-        } catch(e){ box.innerHTML=`<p style="color:var(--error);">Job search failed: ${escapeHtml(e.message)}</p>`; }
-        finally{ loader.classList.add('hide'); }
-    }
     async function loadAIJobs() {
-        const loader=document.getElementById('jobsLoader'), box=document.getElementById('jobsContent');
-        const q=document.getElementById('jobsSearchInput').value.trim() || userProfile.title || 'software developer';
-        loader.classList.remove('hide'); box.innerHTML='';
+        const loader = document.getElementById('jobsLoader');
+        const container = document.getElementById('jobsContent');
+        const input = document.getElementById('jobsSearchInput');
+        const query = (input && input.value.trim()) || userProfile.title || "software developer";
+        loader.classList.remove('hide');
+        container.innerHTML = '';
         try {
-            const res=await fetch(`/api/jobs?q=${encodeURIComponent(q)}`), payload=await res.json();
-            if(!res.ok) throw new Error(payload.error||'Job search failed');
-            box.innerHTML=(payload.jobs||[]).map(renderJobCard).join('') || `<p style="color:var(--text-muted);">No live openings found for "${escapeHtml(q)}".</p>`;
-        } catch(e){ box.innerHTML=`<p style="color:var(--error);">Live jobs could not be loaded: ${escapeHtml(e.message)}</p>`; }
-        finally{ loader.classList.add('hide'); }
-    }
-    function renderJobCard(job){
-        return `<a href="${safeUrl(job.url)}" target="_blank" rel="noopener" class="job-card"><h3 style="margin:0 0 6px">${escapeHtml(job.title)}</h3><div style="color:var(--primary);font-weight:bold">${escapeHtml(job.company)}</div><div style="color:var(--text-muted);font-size:13px;margin-top:6px">📍 ${escapeHtml(job.location||'Remote')} • ${escapeHtml(job.salary||'Salary not listed')}</div><div style="font-size:11px;color:var(--success);margin-top:8px">${escapeHtml(job.source||'Job board')} • Open listing ↗</div></a>`;
+            const res = await fetch(`/api/jobs?q=${encodeURIComponent(query)}`);
+            const payload = await res.json();
+            if (!res.ok) throw new Error(payload.error || 'Job search failed');
+            const jobs = normalizeJobsPayload(payload);
+            container.innerHTML = jobs.length ? jobs.map(renderJobCard).join('') : `<p style="color:var(--text-muted);">No live openings found for "${escapeHtml(query)}" — try a broader search.</p>`;
+        } catch (e) {
+            container.innerHTML = `<p style="color:var(--error);">Live jobs could not be loaded: ${escapeHtml(e.message)}</p>`;
+        } finally { loader.classList.add('hide'); }
     }
 
     /* --- MENTORS (fixed: cards are now clickable, modal has real open/close/booking logic) --- */
@@ -1044,17 +1093,21 @@
         document.getElementById('bookingContainer').innerHTML += `<div class="success-msg">✅ Booked for ${slot}!</div>`;
     }
 
-    /* --- LIVE TRENDS / ARTICLES --- */
+    /* --- LIVE TRENDS: real articles from /api/trending --- */
     async function renderTrendList() {
         try {
-            const res=await fetch('/api/trending'), articles=await res.json();
-            if(!res.ok) throw new Error(articles.error||'Could not load articles');
-            document.getElementById('trendList').innerHTML=articles.length
-              ? articles.slice(0,5).map(t=>`<a href="${safeUrl(t.url)}" target="_blank" rel="noopener" class="trend-link"><span class="trend-source">${escapeHtml(t.src||'News')}</span>${escapeHtml(t.title)}</a>`).join('')
-              : `<p style="color:var(--text-muted)">No articles available right now.</p>`;
-            const ticker=articles.map(t=>`<a href="${safeUrl(t.url)}" target="_blank" rel="noopener" class="ticker-item">📢 ${escapeHtml(t.title)}</a>`).join('');
-            document.getElementById('liveTicker').innerHTML=ticker+ticker;
-        } catch(e){ document.getElementById('trendList').innerHTML=`<p style="color:var(--error)">Articles could not be loaded: ${escapeHtml(e.message)}</p>`; }
+            const res = await fetch('/api/trending');
+            const payload = await res.json();
+            if (!res.ok) throw new Error(payload.error || 'Could not load trends');
+            const articles = Array.isArray(payload) ? payload : (Array.isArray(payload.articles) ? payload.articles : []);
+            document.getElementById('trendList').innerHTML = articles.length
+                ? articles.slice(0, 5).map(t => `<a href="${safeUrl(t.url || t.link)}" target="_blank" rel="noopener" class="trend-link"><span class="trend-source">${escapeHtml(t.src || t.source || 'News')}</span>${escapeHtml(t.title)}</a>`).join('')
+                : `<p style="color:var(--text-muted);">No trends available right now.</p>`;
+            const tickerHtml = articles.map(t => `<a href="${safeUrl(t.url || t.link)}" target="_blank" rel="noopener" class="ticker-item">📢 ${escapeHtml(t.title)}</a>`).join('');
+            document.getElementById('liveTicker').innerHTML = tickerHtml ? tickerHtml + tickerHtml : '';
+        } catch (e) {
+            document.getElementById('trendList').innerHTML = `<p style="color:var(--error);">Articles could not be loaded: ${escapeHtml(e.message)}</p>`;
+        }
     }
 
     async function loadTrending() {
@@ -1078,6 +1131,12 @@
     }
 
     // Lesson content is generated by AI on first view of each module, then cached on the course object.
+    function localLesson(courseTitle, moduleTitle) {
+        return `<div><h2>${escapeHtml(moduleTitle)}</h2><p><strong>Course:</strong> ${escapeHtml(courseTitle)}</p><h3>Learning objectives</h3><ul><li>Understand the core concepts in this topic.</li><li>Recognize the terminology and common patterns.</li><li>Practice the concept with a small example.</li></ul><h3>Explanation</h3><p>This lesson introduces <strong>${escapeHtml(moduleTitle)}</strong> in a beginner-friendly way. Start with the definitions, then work through a small example and practice it yourself.</p><h3>Example</h3><pre style="white-space:pre-wrap; background:rgba(0,0,0,.25); padding:15px; border-radius:10px;">// Practice ${escapeHtml(moduleTitle)}
+// Break the problem into small steps.
+// Test your solution with a simple example.</pre><h3>Common mistakes</h3><ul><li>Trying to memorize without practicing.</li><li>Skipping edge cases.</li><li>Not checking the result with a small example.</li></ul><h3>Quick recap</h3><ol><li>What is the main idea of this topic?</li><li>When would you use it?</li><li>Can you explain the example in your own words?</li></ol></div>`;
+    }
+
     window.loadModule = async function (index, btn) {
         document.querySelectorAll('.module-btn').forEach(b => b.classList.remove('active'));
         if (btn) btn.classList.add('active');
@@ -1085,6 +1144,7 @@
         const learnContent = document.getElementById('learnContent');
         learnContent.classList.remove('hide');
         const mod = currentCourse.modules[index];
+        if (!mod) return;
         if (mod.content) { learnContent.innerHTML = mod.content; return; }
         learnContent.innerHTML = `<div class="loader" style="margin-top:40px;"></div>`;
         try {
@@ -1093,10 +1153,12 @@
                 body: JSON.stringify({ courseTitle: currentCourse.title, moduleTitle: mod.title })
             });
             const data = await res.json();
-            mod.content = data.html || `<p>Could not load this lesson right now.</p>`;
-            if (currentCourse.modules[index] === mod) learnContent.innerHTML = mod.content;
+            if (!res.ok || !data.html) throw new Error(data.error || 'Lesson generation failed');
+            mod.content = data.html;
+            learnContent.innerHTML = mod.content;
         } catch (e) {
-            learnContent.innerHTML = `<p style="color:var(--error)">Could not load this lesson. Try again.</p>`;
+            mod.content = localLesson(currentCourse.title, mod.title);
+            learnContent.innerHTML = mod.content;
         }
     }
 
@@ -1143,9 +1205,16 @@
                 currentUser = user;
                 document.getElementById('login-view').classList.add('hide');
                 document.getElementById('app-view').classList.add('active-app');
-                await loadProfileFromFirestore(user);
+                try {
+                    await loadProfileFromFirestore(user);
+                } catch (e) {
+                    console.error('Profile load failed:', e);
+                    userProfile = { name: user.displayName || 'New User', email: user.email, phone: '', location: '', title: 'Learner', completedCourses: [], xp: 0, pfp: '' };
+                    populateProfileForm();
+                    updateDashboard();
+                }
+                nav('overview');
             } else if (user && !user.emailVerified) {
-                // Signed in but not verified (e.g. left signed in from a previous session) — sign out.
                 auth.signOut();
             }
         });
